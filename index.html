@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在校等時間管理システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', 'sans-serif'; }
+        .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <header class="flex justify-between items-center mb-8 bg-white p-6 rounded-xl shadow-sm">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">在校等時間管理システム</h1>
+                <p class="text-sm text-gray-500">秋田県教育庁モデル準拠・最大50名対応</p>
+            </div>
+            <div id="current-time" class="text-right font-mono text-xl text-blue-600"></div>
+        </header>
+
+        <!-- タブ切り替え -->
+        <div class="flex space-x-4 mb-6 border-b border-gray-200">
+            <button onclick="switchTab('stamping')" id="tab-stamping" class="py-2 px-4 font-semibold tab-active">打刻・入力</button>
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="py-2 px-4 font-semibold text-gray-500">集計・グラフ</button>
+            <button onclick="switchTab('settings')" id="tab-settings" class="py-2 px-4 font-semibold text-gray-500">職員設定</button>
+        </div>
+
+        <!-- 1. 打刻セクション -->
+        <section id="section-stamping" class="space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">職員選択</label>
+                        <select id="staff-select" class="w-full border-gray-300 rounded-lg p-2 border focus:ring-2 focus:ring-blue-500 outline-none">
+                            <!-- JSで生成 -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">日付</label>
+                        <input type="date" id="target-date" class="w-full border-gray-300 rounded-lg p-2 border">
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="recordStamping('in')" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">出勤</button>
+                        <button onclick="recordStamping('out')" class="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition">退勤</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+                <h2 class="text-lg font-bold mb-4">本日の状況</h2>
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="p-3 text-sm font-semibold">氏名</th>
+                            <th class="p-3 text-sm font-semibold">出勤</th>
+                            <th class="p-3 text-sm font-semibold">退勤</th>
+                            <th class="p-3 text-sm font-semibold">在校時間</th>
+                            <th class="p-3 text-sm font-semibold">時間外</th>
+                        </tr>
+                    </thead>
+                    <tbody id="daily-table-body" class="divide-y divide-gray-100">
+                        <!-- JSで生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 2. ダッシュボード・グラフ -->
+        <section id="section-dashboard" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h3 class="font-bold mb-4">月間時間外労働推移 (全体)</h3>
+                    <canvas id="mainChart" height="200"></canvas>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h3 class="font-bold mb-4">個人別・当月状況</h3>
+                    <select id="individual-chart-select" onchange="updateIndividualChart()" class="mb-4 border rounded p-1 w-full text-sm">
+                        <!-- JSで生成 -->
+                    </select>
+                    <canvas id="individualChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="flex space-x-4">
+                <button onclick="exportToExcel()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Excel出力 (当月)</button>
+                <button onclick="window.print()" class="bg-gray-800 text-white px-6 py-2 rounded-lg hover:bg-gray-900">印刷</button>
+            </div>
+        </section>
+
+        <!-- 3. 設定セクション -->
+        <section id="section-settings" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="font-bold mb-4 text-lg">職員登録 (最大50名)</h3>
+                <div class="flex space-x-2 mb-6">
+                    <input type="text" id="new-staff-name" placeholder="氏名を入力" class="border rounded-lg p-2 flex-1">
+                    <button onclick="addStaff()" class="bg-blue-600 text-white px-4 py-2 rounded-lg">追加</button>
+                </div>
+                <ul id="staff-list" class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <!-- JSで生成 -->
+                </ul>
+            </div>
+        </section>
+    </div>
+
+    <!-- メッセージボックス -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg opacity-0 transition-opacity pointer-events-none"></div>
+
+    <script>
+        // --- データ管理 ---
+        let staffList = JSON.parse(localStorage.getItem('staffList')) || ["管理者", "教職員A", "教職員B"];
+        let attendanceData = JSON.parse(localStorage.getItem('attendanceData')) || {};
+
+        // 定数
+        const APP_ID = 'working-hours-app-001';
+        const STANDARD_HOURS = 7.75; // 標準勤務時間 7時間45分
+
+        // --- 初期化 ---
+        window.onload = () => {
+            updateClock();
+            setInterval(updateClock, 1000);
+            document.getElementById('target-date').valueAsDate = new Date();
+            renderStaffOptions();
+            renderDailyTable();
+            initCharts();
+        };
+
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            document.getElementById('current-time').innerText = timeStr;
+        }
+
+        // --- タブ切り替え ---
+        function switchTab(tab) {
+            ['stamping', 'dashboard', 'settings'].forEach(t => {
+                document.getElementById(`section-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('tab-active', 'text-blue-600');
+                document.getElementById(`tab-${t}`).classList.add('text-gray-500');
+            });
+            document.getElementById(`section-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('tab-active', 'text-blue-600');
+            
+            if(tab === 'dashboard') updateCharts();
+        }
+
+        // --- 職員管理 ---
+        function renderStaffOptions() {
+            const select = document.getElementById('staff-select');
+            const chartSelect = document.getElementById('individual-chart-select');
+            const list = document.getElementById('staff-list');
+            
+            const options = staffList.map(name => `<option value="${name}">${name}</option>`).join('');
+            select.innerHTML = options;
+            chartSelect.innerHTML = options;
+            
+            list.innerHTML = staffList.map((name, index) => `
+                <li class="bg-gray-100 p-2 rounded flex justify-between items-center text-sm">
+                    ${name}
+                    <button onclick="removeStaff(${index})" class="text-red-500 hover:text-red-700">×</button>
+                </li>
+            `).join('');
+        }
+
+        function addStaff() {
+            const input = document.getElementById('new-staff-name');
+            const name = input.value.trim();
+            if (name && staffList.length < 50) {
+                staffList.push(name);
+                saveData();
+                renderStaffOptions();
+                input.value = '';
+                showToast("職員を追加しました");
+            } else if(staffList.length >= 50) {
+                showToast("最大50名までです");
+            }
+        }
+
+        function removeStaff(index) {
+            if(confirm("この職員を削除しますか？（記録は残ります）")) {
+                staffList.splice(index, 1);
+                saveData();
+                renderStaffOptions();
+            }
+        }
+
+        // --- 出退勤記録 ---
+        function recordStamping(type) {
+            const name = document.getElementById('staff-select').value;
+            const date = document.getElementById('target-date').value;
+            const now = new Date();
+            const time = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+
+            if (!attendanceData[date]) attendanceData[date] = {};
+            if (!attendanceData[date][name]) attendanceData[date][name] = { in: "", out: "" };
+
+            attendanceData[date][name][type] = time;
+            
+            saveData();
+            renderDailyTable();
+            showToast(`${name}さん: ${type === 'in' ? '出勤' : '退勤'}を記録しました`);
+        }
+
+        function renderDailyTable() {
+            const date = document.getElementById('target-date').value;
+            const tbody = document.getElementById('daily-table-body');
+            const dayData = attendanceData[date] || {};
+
+            tbody.innerHTML = staffList.map(name => {
+                const data = dayData[name] || { in: "", out: "" };
+                let diffStr = "-";
+                let overStr = "-";
+
+                if (data.in && data.out) {
+                    const diff = calculateHours(data.in, data.out);
+                    diffStr = diff.toFixed(2) + "h";
+                    const over = Math.max(0, diff - STANDARD_HOURS);
+                    overStr = over > 0 ? `<span class="text-red-600 font-bold">${over.toFixed(2)}h</span>` : "0.00h";
+                }
+
+                return `
+                    <tr>
+                        <td class="p-3 text-sm border-b">${name}</td>
+                        <td class="p-3 text-sm border-b">${data.in || '---'}</td>
+                        <td class="p-3 text-sm border-b">${data.out || '---'}</td>
+                        <td class="p-3 text-sm border-b">${diffStr}</td>
+                        <td class="p-3 text-sm border-b">${overStr}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function calculateHours(start, end) {
+            const s = start.split(':').map(Number);
+            const e = end.split(':').map(Number);
+            const diffMin = (e[0] * 60 + e[1]) - (s[0] * 60 + s[1]);
+            return diffMin / 60;
+        }
+
+        // --- グラフ・集計 ---
+        let mainChart, individualChart;
+
+        function initCharts() {
+            const ctxMain = document.getElementById('mainChart').getContext('2d');
+            mainChart = new Chart(ctxMain, {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: '総時間外時間', data: [], backgroundColor: '#3b82f6' }] },
+                options: { responsive: true }
+            });
+
+            const ctxIndiv = document.getElementById('individualChart').getContext('2d');
+            individualChart = new Chart(ctxIndiv, {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: '個人の時間外', data: [], borderColor: '#ef4444', tension: 0.1 }] },
+                options: { responsive: true }
+            });
+        }
+
+        function updateCharts() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            
+            // 全体集計
+            const labels = [];
+            const totals = [];
+            for(let i=1; i<=31; i++) {
+                const d = `${year}-${month}-${i.toString().padStart(2, '0')}`;
+                if (i > new Date(year, now.getMonth() + 1, 0).getDate()) break;
+                labels.push(i + "日");
+                
+                let dayTotalOver = 0;
+                if(attendanceData[d]) {
+                    Object.values(attendanceData[d]).forEach(entry => {
+                        if(entry.in && entry.out) {
+                            dayTotalOver += Math.max(0, calculateHours(entry.in, entry.out) - STANDARD_HOURS);
+                        }
+                    });
+                }
+                totals.push(dayTotalOver);
+            }
+            
+            mainChart.data.labels = labels;
+            mainChart.data.datasets[0].data = totals;
+            mainChart.update();
+            
+            updateIndividualChart();
+        }
+
+        function updateIndividualChart() {
+            const name = document.getElementById('individual-chart-select').value;
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const data = [];
+            const labels = [];
+
+            for(let i=1; i<=31; i++) {
+                const d = `${year}-${month}-${i.toString().padStart(2, '0')}`;
+                if (i > new Date(year, now.getMonth() + 1, 0).getDate()) break;
+                labels.push(i);
+                
+                let val = 0;
+                if(attendanceData[d] && attendanceData[d][name]) {
+                    const entry = attendanceData[d][name];
+                    if(entry.in && entry.out) val = Math.max(0, calculateHours(entry.in, entry.out) - STANDARD_HOURS);
+                }
+                data.push(val);
+            }
+
+            individualChart.data.labels = labels;
+            individualChart.data.datasets[0].data = data;
+            individualChart.data.datasets[0].label = `${name}さんの時間外`;
+            individualChart.update();
+        }
+
+        // --- 外部出力 ---
+        function exportToExcel() {
+            const rows = [['日付', '氏名', '出勤', '退勤', '在校時間', '時間外']];
+            const sortedDates = Object.keys(attendanceData).sort();
+            
+            sortedDates.forEach(date => {
+                staffList.forEach(name => {
+                    const d = attendanceData[date][name];
+                    if(d && (d.in || d.out)) {
+                        const diff = (d.in && d.out) ? calculateHours(d.in, d.out) : 0;
+                        const over = Math.max(0, diff - STANDARD_HOURS);
+                        rows.push([date, name, d.in, d.out, diff.toFixed(2), over.toFixed(2)]);
+                    }
+                });
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "勤務記録");
+            XLSX.writeFile(wb, `attendance_report_${new Date().toISOString().slice(0,7)}.xlsx`);
+        }
+
+        // --- ユーティリティ ---
+        function saveData() {
+            localStorage.setItem('staffList', JSON.stringify(staffList));
+            localStorage.setItem('attendanceData', JSON.stringify(attendanceData));
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.remove('opacity-0');
+            setTimeout(() => t.classList.add('opacity-0'), 3000);
+        }
+    </script>
+</body>
+</html>
