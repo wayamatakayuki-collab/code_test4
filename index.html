@@ -1,357 +1,1806 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>在校等時間管理システム</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body { font-family: 'Inter', 'sans-serif'; }
-        .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>在校等時間管理（秋田モデル準拠 / 上書き勤務日 / 平均対象選択）</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+    body { font-family: Inter, system-ui, -apple-system, "Segoe UI", "Noto Sans JP", sans-serif; }
+    .tab-active { border-bottom: 3px solid #2563eb; color: #2563eb; }
+    .no-print { display:block; }
+    @media print {
+      .no-print { display:none !important; }
+      body { background:#fff !important; }
+      .print-card { box-shadow:none !important; border:1px solid #e5e7eb !important; }
+    }
+  </style>
 </head>
+
 <body class="bg-gray-50 min-h-screen">
-    <div class="max-w-6xl mx-auto px-4 py-8">
-        <header class="flex justify-between items-center mb-8 bg-white p-6 rounded-xl shadow-sm">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-800">在校等時間管理システム</h1>
-                <p class="text-sm text-gray-500">秋田県教育庁モデル準拠・最大50名対応</p>
-            </div>
-            <div id="current-time" class="text-right font-mono text-xl text-blue-600"></div>
-        </header>
-
-        <!-- タブ切り替え -->
-        <div class="flex space-x-4 mb-6 border-b border-gray-200">
-            <button onclick="switchTab('stamping')" id="tab-stamping" class="py-2 px-4 font-semibold tab-active">打刻・入力</button>
-            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="py-2 px-4 font-semibold text-gray-500">集計・グラフ</button>
-            <button onclick="switchTab('settings')" id="tab-settings" class="py-2 px-4 font-semibold text-gray-500">職員設定</button>
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <header class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 print-card flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-extrabold text-gray-800 tracking-tight">在校等時間管理システム</h1>
+        <p class="text-sm text-gray-500 mt-1">
+          秋田モデル：在校等＝滞在−(休憩＋除外) ／ 時間外在校等＝在校等−7:45（勤務日）／休日扱いは在校等がそのまま
+        </p>
+      </div>
+      <div class="flex items-center justify-between md:justify-end gap-4">
+        <div class="text-right">
+          <div class="text-xs text-gray-500">現在時刻</div>
+          <div id="current-time" class="font-mono text-2xl font-extrabold text-blue-600"></div>
         </div>
+        <div class="no-print flex gap-2">
+          <button onclick="exportBackupJSON()" class="px-3 py-2 rounded-xl bg-gray-900 text-white text-sm hover:bg-gray-800">バックアップ</button>
+          <label class="px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm hover:bg-gray-50 cursor-pointer">
+            復元<input id="backupFile" type="file" accept="application/json" class="hidden" onchange="importBackupJSON(event)">
+          </label>
+        </div>
+      </div>
+    </header>
 
-        <!-- 1. 打刻セクション -->
-        <section id="section-stamping" class="space-y-6">
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">職員選択</label>
-                        <select id="staff-select" class="w-full border-gray-300 rounded-lg p-2 border focus:ring-2 focus:ring-blue-500 outline-none">
-                            <!-- JSで生成 -->
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">日付</label>
-                        <input type="date" id="target-date" class="w-full border-gray-300 rounded-lg p-2 border">
-                    </div>
-                    <div class="flex space-x-2">
-                        <button onclick="recordStamping('in')" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">出勤</button>
-                        <button onclick="recordStamping('out')" class="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition">退勤</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-                <h2 class="text-lg font-bold mb-4">本日の状況</h2>
-                <table class="w-full text-left">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="p-3 text-sm font-semibold">氏名</th>
-                            <th class="p-3 text-sm font-semibold">出勤</th>
-                            <th class="p-3 text-sm font-semibold">退勤</th>
-                            <th class="p-3 text-sm font-semibold">在校時間</th>
-                            <th class="p-3 text-sm font-semibold">時間外</th>
-                        </tr>
-                    </thead>
-                    <tbody id="daily-table-body" class="divide-y divide-gray-100">
-                        <!-- JSで生成 -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- 2. ダッシュボード・グラフ -->
-        <section id="section-dashboard" class="hidden space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 class="font-bold mb-4">月間時間外労働推移 (全体)</h3>
-                    <canvas id="mainChart" height="200"></canvas>
-                </div>
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 class="font-bold mb-4">個人別・当月状況</h3>
-                    <select id="individual-chart-select" onchange="updateIndividualChart()" class="mb-4 border rounded p-1 w-full text-sm">
-                        <!-- JSで生成 -->
-                    </select>
-                    <canvas id="individualChart" height="200"></canvas>
-                </div>
-            </div>
-
-            <div class="flex space-x-4">
-                <button onclick="exportToExcel()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Excel出力 (当月)</button>
-                <button onclick="window.print()" class="bg-gray-800 text-white px-6 py-2 rounded-lg hover:bg-gray-900">印刷</button>
-            </div>
-        </section>
-
-        <!-- 3. 設定セクション -->
-        <section id="section-settings" class="hidden space-y-6">
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h3 class="font-bold mb-4 text-lg">職員登録 (最大50名)</h3>
-                <div class="flex space-x-2 mb-6">
-                    <input type="text" id="new-staff-name" placeholder="氏名を入力" class="border rounded-lg p-2 flex-1">
-                    <button onclick="addStaff()" class="bg-blue-600 text-white px-4 py-2 rounded-lg">追加</button>
-                </div>
-                <ul id="staff-list" class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <!-- JSで生成 -->
-                </ul>
-            </div>
-        </section>
+    <!-- Tabs -->
+    <div class="flex space-x-4 mb-6 border-b border-gray-200 no-print mt-6">
+      <button onclick="switchTab('stamping')" id="tab-stamping" class="py-2 px-4 font-semibold tab-active">打刻・入力</button>
+      <button onclick="switchTab('dashboard')" id="tab-dashboard" class="py-2 px-4 font-semibold text-gray-500">集計・グラフ</button>
+      <button onclick="switchTab('settings')" id="tab-settings" class="py-2 px-4 font-semibold text-gray-500">設定</button>
     </div>
 
-    <!-- メッセージボックス -->
-    <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg opacity-0 transition-opacity pointer-events-none"></div>
+    <!-- 1) Stamping -->
+    <section id="section-stamping" class="space-y-6">
+      <!-- Picker -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 print-card">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">職員</label>
+            <select id="staff-select" class="w-full border-gray-300 rounded-xl p-2.5 border focus:ring-2 focus:ring-blue-500 outline-none"
+              onchange="syncDayPanelFromData(); renderDailyTable();"></select>
+          </div>
 
-    <script>
-        // --- データ管理 ---
-        let staffList = JSON.parse(localStorage.getItem('staffList')) || ["管理者", "教職員A", "教職員B"];
-        let attendanceData = JSON.parse(localStorage.getItem('attendanceData')) || {};
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">日付</label>
+            <input type="date" id="target-date" class="w-full border-gray-300 rounded-xl p-2.5 border"
+              onchange="onChangeDate()" />
+          </div>
 
-        // 定数
-        const APP_ID = 'working-hours-app-001';
-        const STANDARD_HOURS = 7.75; // 標準勤務時間 7時間45分
+          <div class="md:col-span-2">
+            <div class="text-sm font-semibold text-gray-700 mb-2">この日の扱い（自動＋上書き）</div>
+            <div class="flex flex-wrap gap-2 items-center">
+              <button id="dayMode-auto" onclick="setDayOverrideMode('auto')"
+                class="px-3 py-2 rounded-xl border text-sm bg-blue-50 border-blue-200 text-blue-700 font-semibold">自動</button>
+              <button id="dayMode-work" onclick="setDayOverrideMode('work')"
+                class="px-3 py-2 rounded-xl border text-sm bg-white border-gray-200 text-gray-700 hover:bg-gray-50">勤務日</button>
+              <button id="dayMode-off" onclick="setDayOverrideMode('off')"
+                class="px-3 py-2 rounded-xl border text-sm bg-white border-gray-200 text-gray-700 hover:bg-gray-50">休日（時間外扱い）</button>
 
-        // --- 初期化 ---
-        window.onload = () => {
-            updateClock();
-            setInterval(updateClock, 1000);
-            document.getElementById('target-date').valueAsDate = new Date();
-            renderStaffOptions();
-            renderDailyTable();
-            initCharts();
+              <span id="dayTypeBadge"
+                class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold bg-gray-100 text-gray-700 ml-1">---</span>
+              <span id="dayTypeReason" class="text-xs text-gray-500"></span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">理由（任意）</label>
+                <input id="override-label" type="text" class="w-full border rounded-xl p-2.5"
+                  placeholder="例）代休、振替登校" oninput="saveDayOverrideFromUI()" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">メモ（任意）</label>
+                <input id="override-note" type="text" class="w-full border rounded-xl p-2.5"
+                  placeholder="例）行事対応、出張" oninput="saveDayOverrideFromUI()" />
+              </div>
+              <div class="no-print">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">編集</label>
+                <button onclick="openEditModal()"
+                  class="w-full bg-gray-900 text-white py-2.5 px-4 rounded-xl hover:bg-gray-800 font-semibold">まとめて入力（手入力）</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Input -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 print-card">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <div class="text-lg font-extrabold text-gray-900">簡単入力（選択職員）</div>
+            <div class="text-sm text-gray-500" id="quickSub">---</div>
+          </div>
+
+          <div class="no-print flex gap-2">
+            <button onclick="fillNow('in')" class="px-3 py-2 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 font-semibold">出勤：今</button>
+            <button onclick="fillNow('out')" class="px-3 py-2 rounded-xl bg-red-500 text-white text-sm hover:bg-red-600 font-semibold">退勤：今</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-3 mt-4 items-end">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">出勤</label>
+            <div class="flex gap-1 no-print">
+              <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="shiftTime('in',-5)">-5</button>
+              <input id="quick-in" type="time" class="w-full border rounded-xl p-2.5" onchange="saveQuickTimes()" />
+              <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="shiftTime('in',5)">+5</button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">退勤</label>
+            <div class="flex gap-1 no-print">
+              <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="shiftTime('out',-5)">-5</button>
+              <input id="quick-out" type="time" class="w-full border rounded-xl p-2.5" onchange="saveQuickTimes()" />
+              <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="shiftTime('out',5)">+5</button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">休憩（分）</label>
+            <div class="flex gap-1">
+              <input id="break-min" type="number" min="0" step="5" class="w-full border rounded-xl p-2.5" oninput="saveBreakFromUI()" />
+              <div class="no-print flex gap-1">
+                <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="quickBreak(45)">45</button>
+                <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="quickBreak(60)">60</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">除外（分）</label>
+            <div class="flex gap-1">
+              <input id="exclude-min" type="number" min="0" step="5" class="w-full border rounded-xl p-2.5" oninput="saveExcludeFromUI()" />
+              <div class="no-print flex gap-1">
+                <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="quickExclude(0)">0</button>
+                <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="quickExclude(15)">15</button>
+                <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="quickExclude(60)">60</button>
+              </div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">勤務時間外の自己研鑽・業務外として除く時間</div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">時間外在校等（手入力h）</label>
+            <div class="flex gap-1">
+              <input id="manual-ot" type="number" min="0" step="0.25" class="w-full border rounded-xl p-2.5"
+                oninput="saveManualOTFromUI()" placeholder="未入力=自動計算" />
+              <div class="no-print flex gap-1">
+                <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="bumpManualOT(0.5)">+0.5</button>
+                <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="bumpManualOT(1)">+1</button>
+                <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="clearManualOT()">×</button>
+              </div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">入力があれば自動計算より優先</div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">週休日勤務（手入力h）</label>
+            <div class="flex gap-1">
+              <input id="manual-weekend" type="number" min="0" step="0.25" class="w-full border rounded-xl p-2.5"
+                oninput="saveManualWeekendFromUI()" placeholder="未入力=自動" />
+              <div class="no-print flex gap-1">
+                <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="bumpManualWeekend(0.5)">+0.5</button>
+                <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="bumpManualWeekend(1)">+1</button>
+                <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="clearManualWeekend()">×</button>
+              </div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">土日で「勤務した時間だけ」入れたい場合</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Daily table -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 overflow-x-auto print-card">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <h2 class="text-lg font-extrabold text-gray-800">日別一覧（全職員）</h2>
+          <div class="no-print flex gap-2">
+            <button onclick="copyPrevDay()" class="px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm hover:bg-gray-50">前日を複製</button>
+            <button onclick="clearDay()" class="px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm hover:bg-gray-50 text-red-600">この日をクリア</button>
+          </div>
+        </div>
+
+        <table class="w-full text-left">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="p-3 text-xs font-extrabold text-gray-600">氏名</th>
+              <th class="p-3 text-xs font-extrabold text-gray-600">出勤</th>
+              <th class="p-3 text-xs font-extrabold text-gray-600">退勤</th>
+              <th class="p-3 text-xs font-extrabold text-gray-600">週休日勤務</th>
+              <th class="p-3 text-xs font-extrabold text-gray-600">在校（滞在）</th>
+              <th class="p-3 text-xs font-extrabold text-gray-600">在校等</th>
+              <th class="p-3 text-xs font-extrabold text-gray-600">時間外在校等</th>
+              <th class="p-3 text-xs font-extrabold text-gray-600">備考</th>
+            </tr>
+          </thead>
+          <tbody id="daily-table-body" class="divide-y divide-gray-100"></tbody>
+        </table>
+
+        <div class="text-xs text-gray-500 mt-3">
+          在校等＝在校している時間−(休憩＋除外)。勤務日は「在校等−7:45」の超過分、休日扱いは在校等がそのまま時間外在校等。 [oai_citation:2‡秋田県英語教育ネットワーク](https://www.akita-enet.or.jp/tips/working-hours/)
+        </div>
+      </div>
+    </section>
+
+    <!-- 2) Dashboard -->
+    <section id="section-dashboard" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 no-print">
+        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div class="flex flex-wrap gap-3 items-end">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">集計月</label>
+              <input type="month" id="month-picker" class="border rounded-xl p-2.5" onchange="updateCharts()" />
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">基準（勤務日）</label>
+              <div class="flex items-center gap-2">
+                <input id="std-hours" type="number" step="0.25" min="0" class="border rounded-xl p-2.5 w-28" oninput="saveSettings()" />
+                <span class="text-sm text-gray-500">時間（例：7.75）</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">表示</label>
+              <select id="view-mode" class="border rounded-xl p-2.5" onchange="saveSettings(); updateCharts();">
+                <option value="total">合計</option>
+                <option value="avg">平均（選択職員）</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">目安</label>
+              <div class="flex items-center gap-2">
+                <span class="text-sm px-2 py-1 rounded-full bg-rose-50 text-rose-700 font-bold">月45h</span>
+                <span class="text-sm px-2 py-1 rounded-full bg-rose-50 text-rose-700 font-bold">年360h</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex gap-2">
+            <button onclick="exportToExcelSelectedMonth()" class="bg-green-600 text-white px-5 py-2.5 rounded-xl hover:bg-green-700 font-semibold">Excel出力（選択月）</button>
+            <button onclick="window.print()" class="bg-gray-900 text-white px-5 py-2.5 rounded-xl hover:bg-gray-800 font-semibold">印刷</button>
+          </div>
+        </div>
+
+        <!-- Avg selection -->
+        <div class="mt-6 border rounded-2xl p-4 bg-gray-50">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <div class="text-sm font-extrabold text-gray-900">平均の対象職員（選択可）</div>
+              <div class="text-xs text-gray-500 mt-1">「平均」表示のとき、ここでチェックした職員だけで平均を計算します。</div>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-50 text-sm" onclick="selectAvgAll()">全員</button>
+              <button class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-50 text-sm" onclick="selectAvgNone()">なし</button>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <input id="avg-search" type="text" class="w-full border rounded-xl p-2.5" placeholder="名前で絞り込み" oninput="renderAvgStaffSelector()" />
+          </div>
+
+          <div id="avg-staff-box" class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2"></div>
+        </div>
+
+        <!-- KPI -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mt-6">
+          <div class="p-4 rounded-2xl bg-white border">
+            <div class="text-xs text-gray-500 font-semibold">当月：時間外在校等（合計）</div>
+            <div id="kpi-ot-total" class="text-2xl font-extrabold text-gray-900 mt-1">0.00h</div>
+          </div>
+          <div class="p-4 rounded-2xl bg-white border">
+            <div class="text-xs text-gray-500 font-semibold">当月：在校等（合計）</div>
+            <div id="kpi-zk-total" class="text-2xl font-extrabold text-gray-900 mt-1">0.00h</div>
+          </div>
+          <div class="p-4 rounded-2xl bg-white border">
+            <div class="text-xs text-gray-500 font-semibold">当月：在校（滞在）（合計）</div>
+            <div id="kpi-stay-total" class="text-2xl font-extrabold text-gray-900 mt-1">0.00h</div>
+          </div>
+          <div class="p-4 rounded-2xl bg-white border">
+            <div class="text-xs text-gray-500 font-semibold">当月：週休日勤務（合計）</div>
+            <div id="kpi-weekend-total" class="text-2xl font-extrabold text-gray-900 mt-1">0.00h</div>
+          </div>
+          <div class="p-4 rounded-2xl bg-white border">
+            <div class="text-xs text-gray-500 font-semibold">当月：時間外在校等（平均）</div>
+            <div id="kpi-ot-avg" class="text-2xl font-extrabold text-blue-700 mt-1">0.00h</div>
+            <div id="kpi-ot-avg-sub" class="text-xs text-gray-500 mt-1">対象：0名</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 print-card">
+          <h3 class="font-extrabold text-gray-800">日別：時間外在校等（合計／平均切替）</h3>
+          <canvas id="mainChart" height="220"></canvas>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 print-card">
+          <h3 class="font-extrabold text-gray-800">個人別：日別 時間外在校等</h3>
+          <select id="individual-chart-select" onchange="updateIndividualChart()" class="mt-3 mb-3 border rounded-xl p-2 w-full text-sm"></select>
+          <canvas id="individualChart" height="220"></canvas>
+        </div>
+      </div>
+
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 print-card">
+        <h3 class="font-extrabold text-gray-800 mb-3">個人別：当月集計（在校等／時間外在校等／週休日勤務／在校）</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="p-3 text-xs font-extrabold text-gray-600">氏名</th>
+                <th class="p-3 text-xs font-extrabold text-gray-600">在校（h）</th>
+                <th class="p-3 text-xs font-extrabold text-gray-600">在校等（h）</th>
+                <th class="p-3 text-xs font-extrabold text-gray-600">時間外在校等（h）</th>
+                <th class="p-3 text-xs font-extrabold text-gray-600">週休日勤務（h）</th>
+                <th class="p-3 text-xs font-extrabold text-gray-600">目安（月45h）</th>
+              </tr>
+            </thead>
+            <tbody id="staff-monthly-body" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3) Settings -->
+    <section id="section-settings" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 print-card">
+        <h3 class="font-extrabold mb-4 text-gray-800">職員登録（最大50名）</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 no-print">
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 mb-1">氏名</label>
+            <input type="text" id="new-staff-name" placeholder="氏名を入力" class="border rounded-xl p-2.5 w-full">
+          </div>
+          <div class="flex items-end">
+            <button onclick="addStaff()" class="bg-blue-600 text-white px-4 py-2.5 rounded-xl w-full hover:bg-blue-700 font-semibold">追加</button>
+          </div>
+        </div>
+        <ul id="staff-list" class="grid grid-cols-1 md:grid-cols-2 gap-3"></ul>
+      </div>
+
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 print-card">
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="font-extrabold text-gray-800">勤務日カレンダー（上書き一覧）</h3>
+          <div class="no-print flex gap-2">
+            <button onclick="openCalendarHelper()" class="px-4 py-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 font-semibold">上書き入力</button>
+            <button onclick="clearAllOverrides()" class="px-4 py-2.5 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-red-600 font-semibold">上書きを全削除</button>
+          </div>
+        </div>
+
+        <div class="text-sm text-gray-600 mt-2">
+          上書きがない日は「平日＝勤務日」「土日・祝日＝休日」で自動判定（特例は上書きで調整）。
+        </div>
+
+        <div class="overflow-x-auto mt-4">
+          <table class="w-full text-left">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="p-3 text-xs font-extrabold text-gray-600">日付</th>
+                <th class="p-3 text-xs font-extrabold text-gray-600">上書き</th>
+                <th class="p-3 text-xs font-extrabold text-gray-600">理由</th>
+                <th class="p-3 text-xs font-extrabold text-gray-600">メモ</th>
+                <th class="p-3 text-xs font-extrabold text-gray-600 no-print">操作</th>
+              </tr>
+            </thead>
+            <tbody id="override-table-body" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 print-card">
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="font-extrabold text-gray-800">データ操作</h3>
+          <button onclick="hardResetAll()" class="no-print px-4 py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 font-semibold">全データ初期化</button>
+        </div>
+        <div class="text-sm text-gray-600 mt-2">初期化は戻せません。バックアップ後の実行を推奨します。</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-4 right-4 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-lg opacity-0 transition-opacity pointer-events-none no-print"></div>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 no-print">
+    <div class="bg-white w-full max-w-xl rounded-2xl shadow-xl border border-gray-100">
+      <div class="p-5 border-b flex items-center justify-between">
+        <div>
+          <div class="text-lg font-extrabold text-gray-900">手入力（編集）</div>
+          <div id="editModalSub" class="text-sm text-gray-500 mt-1">---</div>
+        </div>
+        <button onclick="closeEditModal()" class="w-10 h-10 rounded-xl hover:bg-gray-50 text-gray-500">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">出勤</label>
+            <div class="flex gap-1">
+              <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="modalNow('in')">今</button>
+              <input id="editIn" type="time" class="w-full border rounded-xl p-2.5" />
+              <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="modalShift('in',5)">+5</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">退勤</label>
+            <div class="flex gap-1">
+              <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="modalNow('out')">今</button>
+              <input id="editOut" type="time" class="w-full border rounded-xl p-2.5" />
+              <button class="px-2 py-2 rounded-xl border text-xs hover:bg-gray-50" onclick="modalShift('out',5)">+5</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">休憩（分）</label>
+            <input id="editBreak" type="number" min="0" step="5" class="w-full border rounded-xl p-2.5" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">除外（分）</label>
+            <input id="editExclude" type="number" min="0" step="5" class="w-full border rounded-xl p-2.5" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">時間外在校等（手入力h）</label>
+            <input id="editManualOT" type="number" min="0" step="0.25" class="w-full border rounded-xl p-2.5" placeholder="未入力=自動" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">週休日勤務（手入力h）</label>
+            <input id="editManualWeekend" type="number" min="0" step="0.25" class="w-full border rounded-xl p-2.5" placeholder="未入力=自動" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">メモ（任意）</label>
+          <input id="editMemo" type="text" class="w-full border rounded-xl p-2.5" placeholder="例）研修、出張、行事" />
+        </div>
+
+        <div class="bg-gray-50 border rounded-2xl p-4 text-sm text-gray-700">
+          <div class="font-extrabold text-gray-900 mb-2">計算の考え方（秋田モデル）</div>
+          <ul class="list-disc pl-5 space-y-1">
+            <li>在校（滞在）＝出勤〜退勤</li>
+            <li>在校等＝在校（滞在）−（休憩＋除外）</li>
+            <li>勤務日：時間外在校等＝max(0, 在校等−7:45)</li>
+            <li>休日扱い：時間外在校等＝在校等（全部）</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="p-5 border-t flex gap-2">
+        <button onclick="saveEditModal()" class="flex-1 bg-blue-600 text-white py-2.5 rounded-xl hover:bg-blue-700 font-semibold">保存</button>
+        <button onclick="deleteOneRecord()" class="flex-1 bg-white border border-gray-200 py-2.5 rounded-xl hover:bg-gray-50 text-red-600 font-semibold">この記録を削除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calendar helper -->
+  <div id="calendarHelper" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 no-print">
+    <div class="bg-white w-full max-w-xl rounded-2xl shadow-xl border border-gray-100">
+      <div class="p-5 border-b flex items-center justify-between">
+        <div>
+          <div class="text-lg font-extrabold text-gray-900">勤務日カレンダー：上書き入力</div>
+          <div class="text-sm text-gray-500 mt-1">代休（平日→休日）／登校日（土日祝→勤務日）など</div>
+        </div>
+        <button onclick="closeCalendarHelper()" class="w-10 h-10 rounded-xl hover:bg-gray-50 text-gray-500">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">日付</label>
+            <input id="ovDate" type="date" class="w-full border rounded-xl p-2.5" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">上書き</label>
+            <select id="ovType" class="w-full border rounded-xl p-2.5">
+              <option value="work">勤務日</option>
+              <option value="off">休日（時間外扱い）</option>
+              <option value="auto">自動に戻す（上書き削除）</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">理由（任意）</label>
+            <input id="ovLabel" type="text" class="w-full border rounded-xl p-2.5" placeholder="例）代休、振替登校" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">メモ（任意）</label>
+          <input id="ovNote" type="text" class="w-full border rounded-xl p-2.5" placeholder="例）運動会準備、授業参観の振替" />
+        </div>
+
+        <div class="flex gap-2">
+          <button onclick="applyOverrideFromHelper()" class="flex-1 bg-gray-900 text-white py-2.5 rounded-xl hover:bg-gray-800 font-semibold">適用</button>
+          <button onclick="closeCalendarHelper()" class="flex-1 bg-white border border-gray-200 py-2.5 rounded-xl hover:bg-gray-50 font-semibold">閉じる</button>
+        </div>
+
+        <div class="text-xs text-gray-500">
+          祝日判定は一般的なルールで自動判定（特例年は上書きで調整してください）。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------
+    // Storage Keys
+    // -------------------------
+    const LS_KEYS = {
+      staff: 'wh_staffList_v4',
+      attendance: 'wh_attendanceData_v4',
+      overrides: 'wh_calendarOverrides_v4',
+      settings: 'wh_settings_v4',
+    };
+
+    // -------------------------
+    // Default settings
+    // -------------------------
+    const DEFAULT_SETTINGS = {
+      standardHours: 7.75,         // 7時間45分
+      defaultBreakMin: 45,
+      viewMode: 'total',           // total | avg
+      avgStaffSelected: [],        // staff names
+    };
+
+    // -------------------------
+    // Data
+    // attendanceData[date][name] = {
+    //   in,out, breakMin, excludeMin,
+    //   manualOTMin, manualWeekendMin,
+    //   memo
+    // }
+    // -------------------------
+    let staffList = loadJSON(LS_KEYS.staff, null);
+    let attendanceData = loadJSON(LS_KEYS.attendance, {});
+    let calendarOverrides = loadJSON(LS_KEYS.overrides, {});
+    let settings = loadJSON(LS_KEYS.settings, DEFAULT_SETTINGS);
+
+    // migrate from older minimal lists
+    if (!staffList) {
+      const old = JSON.parse(localStorage.getItem('staffList') || 'null');
+      if (Array.isArray(old)) {
+        staffList = old.map(n => ({ name: String(n), standardHours: settings.standardHours }));
+      } else {
+        staffList = [{ name:"管理者", standardHours: DEFAULT_SETTINGS.standardHours }, { name:"教職員A", standardHours: DEFAULT_SETTINGS.standardHours }];
+      }
+      saveAll();
+    }
+
+    // Charts
+    let mainChart, individualChart;
+
+    window.onload = () => {
+      updateClock();
+      setInterval(updateClock, 1000);
+
+      const today = new Date();
+      document.getElementById('target-date').valueAsDate = today;
+      document.getElementById('month-picker').value = toYM(today);
+
+      document.getElementById('std-hours').value = settings.standardHours;
+      document.getElementById('view-mode').value = settings.viewMode || 'total';
+
+      renderStaffOptions();
+      syncDayPanelFromData();
+      renderDailyTable();
+      renderOverridesTable();
+
+      initCharts();
+    };
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('current-time').innerText =
+        now.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    }
+
+    // -------------------------
+    // Tabs
+    // -------------------------
+    function switchTab(tab) {
+      ['stamping','dashboard','settings'].forEach(t => {
+        document.getElementById(`section-${t}`).classList.add('hidden');
+        document.getElementById(`tab-${t}`).classList.remove('tab-active','text-blue-600');
+        document.getElementById(`tab-${t}`).classList.add('text-gray-500');
+      });
+      document.getElementById(`section-${tab}`).classList.remove('hidden');
+      document.getElementById(`tab-${tab}`).classList.add('tab-active','text-blue-600');
+
+      if (tab === 'dashboard') {
+        renderAvgStaffSelector();
+        updateCharts();
+      }
+      if (tab === 'settings') renderOverridesTable();
+    }
+
+    // -------------------------
+    // Staff
+    // -------------------------
+    function renderStaffOptions() {
+      const select = document.getElementById('staff-select');
+      const chartSelect = document.getElementById('individual-chart-select');
+      const list = document.getElementById('staff-list');
+
+      const opts = staffList.map(s => `<option value="${escapeHTML(s.name)}">${escapeHTML(s.name)}</option>`).join('');
+      select.innerHTML = opts;
+      chartSelect.innerHTML = opts;
+
+      list.innerHTML = staffList.map((s, idx) => `
+        <li class="bg-gray-50 border rounded-2xl p-4 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="font-extrabold text-gray-900 truncate">${escapeHTML(s.name)}</div>
+            <div class="text-xs text-gray-500 mt-1">勤務日基準：${Number(s.standardHours ?? settings.standardHours).toFixed(2)}h</div>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-50 text-sm" onclick="openStaffStandard(${idx})">基準</button>
+            <button class="px-3 py-2 rounded-xl border bg-white hover:bg-gray-50 text-sm text-red-600" onclick="removeStaff(${idx})">削除</button>
+          </div>
+        </li>
+      `).join('');
+
+      if (!Array.isArray(settings.avgStaffSelected) || settings.avgStaffSelected.length === 0) {
+        settings.avgStaffSelected = staffList.map(s => s.name);
+        saveAll();
+      }
+
+      updateQuickSub();
+    }
+
+    function addStaff() {
+      const input = document.getElementById('new-staff-name');
+      const name = input.value.trim();
+      if (!name) return;
+
+      if (staffList.length >= 50) { showToast("最大50名までです"); return; }
+      if (staffList.some(s => s.name === name)) { showToast("同名の職員が既にいます"); return; }
+
+      staffList.push({ name, standardHours: settings.standardHours });
+      if (!settings.avgStaffSelected.includes(name)) settings.avgStaffSelected.push(name);
+
+      saveAll();
+      renderStaffOptions();
+      renderDailyTable();
+      input.value = '';
+      showToast("職員を追加しました");
+    }
+
+    function removeStaff(index) {
+      const s = staffList[index];
+      if (!s) return;
+      if (!confirm(`「${s.name}」を削除しますか？（勤務記録は残ります）`)) return;
+
+      staffList.splice(index, 1);
+      settings.avgStaffSelected = (settings.avgStaffSelected || []).filter(n => n !== s.name);
+
+      saveAll();
+      renderStaffOptions();
+      renderDailyTable();
+      showToast("職員を削除しました");
+    }
+
+    function openStaffStandard(index) {
+      const s = staffList[index];
+      if (!s) return;
+      const v = prompt(`「${s.name}」の勤務日 基準時間（時間）を入力（例：7.75）`, String(s.standardHours ?? settings.standardHours));
+      if (v === null) return;
+      const n = Number(v);
+      if (!isFinite(n) || n < 0) { showToast("数値が不正です"); return; }
+      s.standardHours = n;
+      saveAll();
+      showToast("基準時間を更新しました");
+      renderDailyTable();
+      if (!document.getElementById('section-dashboard').classList.contains('hidden')) updateCharts();
+    }
+
+    // -------------------------
+    // Date change
+    // -------------------------
+    function onChangeDate() {
+      syncDayPanelFromData();
+      renderDailyTable();
+    }
+
+    // -------------------------
+    // Day mode override
+    // -------------------------
+    function setDayOverrideMode(mode) {
+      const date = document.getElementById('target-date').value;
+      if (!date) return;
+
+      if (mode === 'auto') {
+        delete calendarOverrides[date];
+      } else {
+        if (!calendarOverrides[date]) calendarOverrides[date] = { mode, label:'', note:'' };
+        calendarOverrides[date].mode = mode;
+      }
+
+      saveAll();
+      syncDayPanelFromData();
+      renderDailyTable();
+      renderOverridesTable();
+      showToast("日の扱いを更新しました");
+    }
+
+    function saveDayOverrideFromUI() {
+      const date = document.getElementById('target-date').value;
+      const ov = calendarOverrides[date];
+      if (!ov) return;
+
+      ov.label = document.getElementById('override-label').value.trim();
+      ov.note  = document.getElementById('override-note').value.trim();
+      saveAll();
+      renderOverridesTable();
+    }
+
+    function getDayModeEffective(dateStr) {
+      const ov = calendarOverrides[dateStr];
+      if (ov && (ov.mode === 'work' || ov.mode === 'off')) {
+        return {
+          isWorkday: ov.mode === 'work',
+          source: 'override',
+          reason: ov.mode === 'work' ? '上書き：勤務日' : '上書き：休日（時間外扱い）',
+          label: ov.label || '',
+          note: ov.note || ''
         };
+      }
 
-        function updateClock() {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            document.getElementById('current-time').innerText = timeStr;
+      const dt = parseDate(dateStr);
+      const dow = dt.getDay();
+      const isWeekend = (dow === 0 || dow === 6);
+      const isHol = isJapaneseHoliday(dt);
+
+      if (isWeekend) return { isWorkday:false, source:'auto', reason:'自動：土日', label:'', note:'' };
+      if (isHol)     return { isWorkday:false, source:'auto', reason:'自動：祝日', label:'', note:'' };
+      return { isWorkday:true, source:'auto', reason:'自動：平日（勤務日）', label:'', note:'' };
+    }
+
+    function syncDayPanelFromData() {
+      const date = document.getElementById('target-date').value;
+      const name = document.getElementById('staff-select').value;
+      if (!date || !name) return;
+
+      const ov = calendarOverrides[date];
+      const btnAuto = document.getElementById('dayMode-auto');
+      const btnWork = document.getElementById('dayMode-work');
+      const btnOff  = document.getElementById('dayMode-off');
+
+      [btnAuto, btnWork, btnOff].forEach(b => {
+        b.classList.remove('bg-blue-50','border-blue-200','text-blue-700','font-semibold');
+        b.classList.add('bg-white','border-gray-200','text-gray-700');
+      });
+      if (!ov) btnAuto.classList.add('bg-blue-50','border-blue-200','text-blue-700','font-semibold');
+      else if (ov.mode === 'work') btnWork.classList.add('bg-blue-50','border-blue-200','text-blue-700','font-semibold');
+      else if (ov.mode === 'off')  btnOff.classList.add('bg-blue-50','border-blue-200','text-blue-700','font-semibold');
+
+      const eff = getDayModeEffective(date);
+      const badge = document.getElementById('dayTypeBadge');
+      const reason = document.getElementById('dayTypeReason');
+
+      if (eff.isWorkday) {
+        badge.className = "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-700";
+        badge.textContent = "勤務日";
+      } else {
+        badge.className = "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-extrabold bg-rose-100 text-rose-700";
+        badge.textContent = "休日（時間外扱い）";
+      }
+      reason.textContent = eff.reason;
+
+      document.getElementById('override-label').value = (ov && ov.label) ? ov.label : '';
+      document.getElementById('override-note').value  = (ov && ov.note)  ? ov.note  : '';
+
+      const rec = getRecord(date, name) || {};
+      document.getElementById('quick-in').value  = rec.in || '';
+      document.getElementById('quick-out').value = rec.out || '';
+
+      document.getElementById('break-min').value = (rec.breakMin ?? settings.defaultBreakMin);
+      document.getElementById('exclude-min').value = (rec.excludeMin ?? 0);
+
+      document.getElementById('manual-ot').value =
+        (rec.manualOTMin != null && isFinite(rec.manualOTMin)) ? (rec.manualOTMin/60).toFixed(2) : '';
+
+      document.getElementById('manual-weekend').value =
+        (rec.manualWeekendMin != null && isFinite(rec.manualWeekendMin)) ? (rec.manualWeekendMin/60).toFixed(2) : '';
+
+      updateQuickSub();
+    }
+
+    function updateQuickSub() {
+      const date = document.getElementById('target-date')?.value;
+      const name = document.getElementById('staff-select')?.value;
+      if (!date || !name) return;
+      const eff = getDayModeEffective(date);
+      document.getElementById('quickSub').textContent =
+        `${date}（${weekdayJP(parseDate(date))}）／${name} ｜ ${eff.isWorkday ? '勤務日' : '休日（時間外扱い）'}：${eff.reason}`;
+    }
+
+    // -------------------------
+    // Quick input
+    // -------------------------
+    function fillNow(kind) {
+      const now = new Date();
+      const t = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+      if (kind === 'in') document.getElementById('quick-in').value = t;
+      if (kind === 'out') document.getElementById('quick-out').value = t;
+      saveQuickTimes();
+    }
+
+    function shiftTime(kind, deltaMin) {
+      const el = (kind === 'in') ? document.getElementById('quick-in') : document.getElementById('quick-out');
+      const v = el.value;
+      if (!v) return;
+      const p = parseTime(v);
+      if (!p) return;
+      let total = p.h * 60 + p.m + deltaMin;
+      total = (total + 24*60) % (24*60);
+      el.value = pad2(Math.floor(total/60)) + ':' + pad2(total%60);
+      saveQuickTimes();
+    }
+
+    function saveQuickTimes() {
+      const date = document.getElementById('target-date').value;
+      const name = document.getElementById('staff-select').value;
+      const rec = ensureRecord(date, name);
+
+      rec.in = document.getElementById('quick-in').value || '';
+      rec.out = document.getElementById('quick-out').value || '';
+      rec.breakMin = clampInt(document.getElementById('break-min').value, 0, 600);
+      rec.excludeMin = clampInt(document.getElementById('exclude-min').value, 0, 600);
+
+      saveAll();
+      renderDailyTable();
+      if (!document.getElementById('section-dashboard').classList.contains('hidden')) updateCharts();
+    }
+
+    function quickBreak(min) { document.getElementById('break-min').value = min; saveBreakFromUI(); }
+    function saveBreakFromUI() {
+      const date = document.getElementById('target-date').value;
+      const name = document.getElementById('staff-select').value;
+      const rec = ensureRecord(date, name);
+      rec.breakMin = clampInt(document.getElementById('break-min').value, 0, 600);
+      saveAll(); renderDailyTable();
+      if (!document.getElementById('section-dashboard').classList.contains('hidden')) updateCharts();
+    }
+
+    function quickExclude(min) { document.getElementById('exclude-min').value = min; saveExcludeFromUI(); }
+    function saveExcludeFromUI() {
+      const date = document.getElementById('target-date').value;
+      const name = document.getElementById('staff-select').value;
+      const rec = ensureRecord(date, name);
+      rec.excludeMin = clampInt(document.getElementById('exclude-min').value, 0, 600);
+      saveAll(); renderDailyTable();
+      if (!document.getElementById('section-dashboard').classList.contains('hidden')) updateCharts();
+    }
+
+    function saveManualOTFromUI() {
+      const date = document.getElementById('target-date').value;
+      const name = document.getElementById('staff-select').value;
+      const rec = ensureRecord(date, name);
+
+      const v = document.getElementById('manual-ot').value;
+      if (v === '' || v == null) rec.manualOTMin = null;
+      else {
+        const h = Number(v);
+        rec.manualOTMin = (isFinite(h) && h >= 0) ? Math.round(h * 60) : null;
+      }
+
+      saveAll(); renderDailyTable();
+      if (!document.getElementById('section-dashboard').classList.contains('hidden')) updateCharts();
+    }
+    function bumpManualOT(deltaH) {
+      const el = document.getElementById('manual-ot');
+      const cur = el.value === '' ? 0 : Number(el.value);
+      const next = (isFinite(cur) ? cur : 0) + deltaH;
+      el.value = Math.max(0, next).toFixed(2);
+      saveManualOTFromUI();
+    }
+    function clearManualOT() { document.getElementById('manual-ot').value = ''; saveManualOTFromUI(); }
+
+    function saveManualWeekendFromUI() {
+      const date = document.getElementById('target-date').value;
+      const name = document.getElementById('staff-select').value;
+      const rec = ensureRecord(date, name);
+
+      const v = document.getElementById('manual-weekend').value;
+      if (v === '' || v == null) rec.manualWeekendMin = null;
+      else {
+        const h = Number(v);
+        rec.manualWeekendMin = (isFinite(h) && h >= 0) ? Math.round(h * 60) : null;
+      }
+
+      saveAll(); renderDailyTable();
+      if (!document.getElementById('section-dashboard').classList.contains('hidden')) updateCharts();
+    }
+    function bumpManualWeekend(deltaH) {
+      const el = document.getElementById('manual-weekend');
+      const cur = el.value === '' ? 0 : Number(el.value);
+      const next = (isFinite(cur) ? cur : 0) + deltaH;
+      el.value = Math.max(0, next).toFixed(2);
+      saveManualWeekendFromUI();
+    }
+    function clearManualWeekend() { document.getElementById('manual-weekend').value = ''; saveManualWeekendFromUI(); }
+
+    // -------------------------
+    // Daily table
+    // -------------------------
+    function renderDailyTable() {
+      const date = document.getElementById('target-date').value;
+      if (!date) return;
+
+      const effDay = getDayModeEffective(date);
+      const tbody = document.getElementById('daily-table-body');
+
+      tbody.innerHTML = staffList.map(s => {
+        const name = s.name;
+        const rec = getRecord(date, name) || { in:'', out:'', breakMin:null, excludeMin:null, manualOTMin:null, manualWeekendMin:null, memo:'' };
+
+        const breakMin = rec.breakMin ?? settings.defaultBreakMin;
+        const excludeMin = rec.excludeMin ?? 0;
+
+        const rawMin = calcRawMinutes(rec.in, rec.out); // 在校（滞在）
+        const zkMin = (rawMin == null) ? null : Math.max(0, rawMin - (breakMin + excludeMin)); // 在校等
+
+        const stdMin = Math.round((Number(s.standardHours ?? settings.standardHours)) * 60);
+
+        // ot
+        let otMin = null;
+        if (zkMin != null) otMin = effDay.isWorkday ? Math.max(0, zkMin - stdMin) : zkMin;
+
+        // manual OT overrides
+        const manualOTUsed = (rec.manualOTMin != null && isFinite(rec.manualOTMin));
+        const otFinalMin = manualOTUsed ? rec.manualOTMin : otMin;
+
+        // weekend work: only meaningful on Sat/Sun (auto weekly holiday)
+        const isWeeklyHoliday = isWeeklyHolidayAuto(date);
+        let weekendWorkMinAuto = (!effDay.isWorkday && isWeeklyHoliday && zkMin != null) ? zkMin : 0;
+        const manualWeekendUsed = (rec.manualWeekendMin != null && isFinite(rec.manualWeekendMin));
+        const weekendFinalMin = manualWeekendUsed ? rec.manualWeekendMin : weekendWorkMinAuto;
+
+        const dispIn = rec.in || '---';
+        const dispOut = rec.out || '---';
+        const dispWeekend = (zkMin == null ? '-' : `${(weekendFinalMin/60).toFixed(2)}h`);
+        const dispRaw = (rawMin == null ? '-' : `${(rawMin/60).toFixed(2)}h`);
+        const dispZk  = (zkMin == null ? '-' : `${(zkMin/60).toFixed(2)}h`);
+        const dispOT  = (otFinalMin == null ? '-' : formatOT(otFinalMin));
+
+        const memo = [];
+        if (manualOTUsed) memo.push('時間外：手入力');
+        if (manualWeekendUsed) memo.push('週休日：手入力');
+        if (!effDay.isWorkday && (zkMin ?? 0) > 0) memo.push('休日扱い');
+        if (rec.memo) memo.push(rec.memo);
+
+        return `
+          <tr class="hover:bg-gray-50">
+            <td class="p-3 text-sm font-extrabold text-gray-900">${escapeHTML(name)}</td>
+            <td class="p-3 text-sm">${dispIn}</td>
+            <td class="p-3 text-sm">${dispOut}</td>
+            <td class="p-3 text-sm">${dispWeekend}</td>
+            <td class="p-3 text-sm">
+              ${dispRaw}
+              <div class="text-xs text-gray-400 mt-1">休憩${breakMin} / 除外${excludeMin}</div>
+            </td>
+            <td class="p-3 text-sm font-semibold">${dispZk}</td>
+            <td class="p-3 text-sm">${dispOT}</td>
+            <td class="p-3 text-xs text-gray-600">${escapeHTML(memo.join(' / '))}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function formatOT(min) {
+      const h = min / 60;
+      if (h <= 0.0001) return `0.00h`;
+      return `<span class="font-extrabold text-rose-700">${h.toFixed(2)}h</span>`;
+    }
+
+    // -------------------------
+    // Copy/Clear
+    // -------------------------
+    function copyPrevDay() {
+      const date = document.getElementById('target-date').value;
+      if (!date) return;
+      const prevKey = toYMD(addDays(parseDate(date), -1));
+      if (!attendanceData[prevKey]) { showToast("前日の記録がありません"); return; }
+      if (!confirm("前日の記録をこの日に複製しますか？")) return;
+
+      if (!attendanceData[date]) attendanceData[date] = {};
+      staffList.forEach(s => {
+        const p = attendanceData[prevKey][s.name];
+        if (p) attendanceData[date][s.name] = JSON.parse(JSON.stringify(p));
+      });
+
+      saveAll();
+      syncDayPanelFromData();
+      renderDailyTable();
+      showToast("前日を複製しました");
+    }
+
+    function clearDay() {
+      const date = document.getElementById('target-date').value;
+      if (!date) return;
+      if (!confirm("この日の全職員の記録を削除しますか？")) return;
+
+      delete attendanceData[date];
+      saveAll();
+      syncDayPanelFromData();
+      renderDailyTable();
+      showToast("この日の記録をクリアしました");
+    }
+
+    // -------------------------
+    // Charts & Aggregation
+    // -------------------------
+    function initCharts() {
+      const ctxMain = document.getElementById('mainChart').getContext('2d');
+      mainChart = new Chart(ctxMain, {
+        type: 'bar',
+        data: { labels: [], datasets: [{ label: '時間外在校等（h）', data: [], backgroundColor: '#3b82f6' }] },
+        options: { responsive:true, scales:{ y:{ beginAtZero:true } } }
+      });
+
+      const ctxInd = document.getElementById('individualChart').getContext('2d');
+      individualChart = new Chart(ctxInd, {
+        type: 'line',
+        data: { labels: [], datasets: [{ label: '個人の時間外在校等（h）', data: [], borderColor:'#ef4444', tension:0.15 }] },
+        options: { responsive:true, scales:{ y:{ beginAtZero:true } } }
+      });
+
+      renderAvgStaffSelector();
+      updateCharts();
+    }
+
+    function updateCharts() {
+      settings.standardHours = Number(document.getElementById('std-hours').value) || DEFAULT_SETTINGS.standardHours;
+      settings.viewMode = document.getElementById('view-mode').value || 'total';
+      saveAll();
+
+      const ym = document.getElementById('month-picker').value;
+      if (!ym) return;
+      const [y, m] = ym.split('-').map(Number);
+      const dim = daysInMonth(y, m);
+
+      const selected = getAvgSelectedStaff();
+      const selCount = selected.length;
+
+      const labels = [];
+      const otSeries = [];
+
+      // overall KPI totals
+      let otTotalMin = 0;
+      let zkTotalMin = 0;
+      let stayTotalMin = 0;
+      let weekendTotalMin = 0;
+
+      // per staff monthly totals
+      const staffTotals = {};
+      staffList.forEach(s => staffTotals[s.name] = { stayMin:0, zkMin:0, otMin:0, weekendMin:0 });
+
+      for (let d=1; d<=dim; d++) {
+        const dateKey = `${y}-${pad2(m)}-${pad2(d)}`;
+        labels.push(`${d}日`);
+        const eff = getDayModeEffective(dateKey);
+        const isWeekly = isWeeklyHolidayAuto(dateKey);
+
+        let dayOtMin = 0;
+
+        staffList.forEach(s => {
+          const rec = getRecord(dateKey, s.name);
+          if (!rec || !rec.in || !rec.out) return;
+
+          const breakMin = rec.breakMin ?? settings.defaultBreakMin;
+          const excludeMin = rec.excludeMin ?? 0;
+
+          const rawMin = calcRawMinutes(rec.in, rec.out);
+          if (rawMin == null) return;
+
+          const zkMin = Math.max(0, rawMin - (breakMin + excludeMin));
+          const stdMin = Math.round((Number(s.standardHours ?? settings.standardHours)) * 60);
+
+          let otMin = eff.isWorkday ? Math.max(0, zkMin - stdMin) : zkMin;
+          if (rec.manualOTMin != null && isFinite(rec.manualOTMin)) otMin = rec.manualOTMin;
+
+          let weekendMinAuto = (!eff.isWorkday && isWeekly) ? zkMin : 0;
+          let weekendMin = weekendMinAuto;
+          if (rec.manualWeekendMin != null && isFinite(rec.manualWeekendMin)) weekendMin = rec.manualWeekendMin;
+
+          // totals
+          stayTotalMin += rawMin;
+          zkTotalMin += zkMin;
+          otTotalMin += otMin;
+          weekendTotalMin += weekendMin;
+
+          // per staff
+          staffTotals[s.name].stayMin += rawMin;
+          staffTotals[s.name].zkMin += zkMin;
+          staffTotals[s.name].otMin += otMin;
+          staffTotals[s.name].weekendMin += weekendMin;
+
+          // chart
+          if (settings.viewMode === 'avg') {
+            if (selected.includes(s.name)) dayOtMin += otMin;
+          } else {
+            dayOtMin += otMin;
+          }
+        });
+
+        let dayValH = 0;
+        if (settings.viewMode === 'avg') dayValH = (selCount > 0) ? (dayOtMin/60)/selCount : 0;
+        else dayValH = dayOtMin/60;
+
+        otSeries.push(Number(dayValH.toFixed(2)));
+      }
+
+      mainChart.data.labels = labels;
+      mainChart.data.datasets[0].data = otSeries;
+      mainChart.data.datasets[0].label =
+        (settings.viewMode === 'avg') ? `時間外在校等（平均/日・選択${selCount}名）` : '時間外在校等（合計/日）';
+      mainChart.update();
+
+      // KPIs
+      document.getElementById('kpi-ot-total').innerText = `${(otTotalMin/60).toFixed(2)}h`;
+      document.getElementById('kpi-zk-total').innerText = `${(zkTotalMin/60).toFixed(2)}h`;
+      document.getElementById('kpi-stay-total').innerText = `${(stayTotalMin/60).toFixed(2)}h`;
+      document.getElementById('kpi-weekend-total').innerText = `${(weekendTotalMin/60).toFixed(2)}h`;
+
+      const avgOT = (selCount > 0) ? (calcMonthlyOTForStaff(ym, selected)/60)/selCount : 0;
+      document.getElementById('kpi-ot-avg').innerText = `${avgOT.toFixed(2)}h`;
+      document.getElementById('kpi-ot-avg-sub').innerText = `対象：${selCount}名`;
+
+      renderStaffMonthlyTable(staffTotals);
+      updateIndividualChart();
+    }
+
+    function calcMonthlyOTForStaff(ym, staffNames) {
+      const [y, m] = ym.split('-').map(Number);
+      const dim = daysInMonth(y, m);
+      let totalMin = 0;
+
+      for (let d=1; d<=dim; d++) {
+        const dateKey = `${y}-${pad2(m)}-${pad2(d)}`;
+        const eff = getDayModeEffective(dateKey);
+
+        staffNames.forEach(name => {
+          const staff = staffList.find(s => s.name === name);
+          if (!staff) return;
+
+          const rec = getRecord(dateKey, name);
+          if (!rec || !rec.in || !rec.out) return;
+
+          const breakMin = rec.breakMin ?? settings.defaultBreakMin;
+          const excludeMin = rec.excludeMin ?? 0;
+
+          const rawMin = calcRawMinutes(rec.in, rec.out);
+          if (rawMin == null) return;
+
+          const zkMin = Math.max(0, rawMin - (breakMin + excludeMin));
+          const stdMin = Math.round((Number(staff.standardHours ?? settings.standardHours)) * 60);
+
+          let otMin = eff.isWorkday ? Math.max(0, zkMin - stdMin) : zkMin;
+          if (rec.manualOTMin != null && isFinite(rec.manualOTMin)) otMin = rec.manualOTMin;
+
+          totalMin += otMin;
+        });
+      }
+      return totalMin;
+    }
+
+    function updateIndividualChart() {
+      const ym = document.getElementById('month-picker').value;
+      if (!ym) return;
+
+      const name = document.getElementById('individual-chart-select').value;
+      const staff = staffList.find(s => s.name === name);
+      if (!staff) return;
+
+      const [y, m] = ym.split('-').map(Number);
+      const dim = daysInMonth(y, m);
+
+      const labels = [];
+      const data = [];
+
+      for (let d=1; d<=dim; d++) {
+        const dateKey = `${y}-${pad2(m)}-${pad2(d)}`;
+        labels.push(d);
+
+        const eff = getDayModeEffective(dateKey);
+        const rec = getRecord(dateKey, name);
+        if (!rec || !rec.in || !rec.out) { data.push(0); continue; }
+
+        const breakMin = rec.breakMin ?? settings.defaultBreakMin;
+        const excludeMin = rec.excludeMin ?? 0;
+
+        const rawMin = calcRawMinutes(rec.in, rec.out);
+        if (rawMin == null) { data.push(0); continue; }
+
+        const zkMin = Math.max(0, rawMin - (breakMin + excludeMin));
+        const stdMin = Math.round((Number(staff.standardHours ?? settings.standardHours)) * 60);
+
+        let otMin = eff.isWorkday ? Math.max(0, zkMin - stdMin) : zkMin;
+        if (rec.manualOTMin != null && isFinite(rec.manualOTMin)) otMin = rec.manualOTMin;
+
+        data.push(Number((otMin/60).toFixed(2)));
+      }
+
+      individualChart.data.labels = labels;
+      individualChart.data.datasets[0].data = data;
+      individualChart.data.datasets[0].label = `${name}：時間外在校等（h）`;
+      individualChart.update();
+    }
+
+    function renderStaffMonthlyTable(staffTotals) {
+      const tbody = document.getElementById('staff-monthly-body');
+      const rows = staffList.map(s => {
+        const t = staffTotals[s.name] || { stayMin:0, zkMin:0, otMin:0, weekendMin:0 };
+        const otH = t.otMin/60;
+        const badge = otH >= 45
+          ? `<span class="text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-700 font-bold">超（45h）</span>`
+          : `<span class="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold">範囲内</span>`;
+        return `
+          <tr>
+            <td class="p-3 text-sm font-extrabold text-gray-900">${escapeHTML(s.name)}</td>
+            <td class="p-3 text-sm">${(t.stayMin/60).toFixed(2)}</td>
+            <td class="p-3 text-sm">${(t.zkMin/60).toFixed(2)}</td>
+            <td class="p-3 text-sm font-extrabold ${otH>=45?'text-rose-700':'text-gray-900'}">${otH.toFixed(2)}</td>
+            <td class="p-3 text-sm">${(t.weekendMin/60).toFixed(2)}</td>
+            <td class="p-3 text-sm">${badge}</td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.innerHTML = rows || `<tr><td colspan="6" class="p-3 text-sm text-gray-500">データがありません。</td></tr>`;
+    }
+
+    // -------------------------
+    // Avg selector
+    // -------------------------
+    function renderAvgStaffSelector() {
+      const box = document.getElementById('avg-staff-box');
+      if (!box) return;
+
+      const q = (document.getElementById('avg-search')?.value || '').trim().toLowerCase();
+      const selected = new Set(getAvgSelectedStaff());
+
+      const items = staffList
+        .filter(s => !q || s.name.toLowerCase().includes(q))
+        .map(s => {
+          const checked = selected.has(s.name);
+          return `
+            <label class="flex items-center gap-3 bg-white border rounded-2xl p-3 cursor-pointer hover:bg-gray-50">
+              <input type="checkbox" class="w-4 h-4" ${checked ? 'checked' : ''} onchange="toggleAvgStaff('${escapeAttr(s.name)}', this.checked)" />
+              <span class="text-sm font-semibold text-gray-800">${escapeHTML(s.name)}</span>
+            </label>
+          `;
+        }).join('');
+
+      box.innerHTML = items || `<div class="text-sm text-gray-500">該当する職員がいません。</div>`;
+    }
+
+    function toggleAvgStaff(name, isOn) {
+      const set = new Set(getAvgSelectedStaff());
+      if (isOn) set.add(name);
+      else set.delete(name);
+      settings.avgStaffSelected = Array.from(set);
+      saveAll();
+      updateCharts();
+    }
+
+    function selectAvgAll() {
+      settings.avgStaffSelected = staffList.map(s => s.name);
+      saveAll();
+      renderAvgStaffSelector();
+      updateCharts();
+    }
+
+    function selectAvgNone() {
+      settings.avgStaffSelected = [];
+      saveAll();
+      renderAvgStaffSelector();
+      updateCharts();
+    }
+
+    function getAvgSelectedStaff() {
+      const arr = Array.isArray(settings.avgStaffSelected) ? settings.avgStaffSelected : [];
+      const names = new Set(staffList.map(s => s.name));
+      return arr.filter(n => names.has(n));
+    }
+
+    // -------------------------
+    // Excel export (selected month)
+    // -------------------------
+    function exportToExcelSelectedMonth() {
+      const ym = document.getElementById('month-picker').value;
+      if (!ym) return;
+
+      const [y, m] = ym.split('-').map(Number);
+      const dim = daysInMonth(y, m);
+
+      const rows = [[
+        '日付','曜日','勤務/休日','理由','メモ(上書き)','氏名',
+        '出勤','退勤','休憩(分)','除外(分)',
+        '在校(滞在)(h)','在校等(h)','時間外在校等(h)','週休日勤務(h)',
+        '時間外(手入力h)','週休日(手入力h)','記録メモ'
+      ]];
+
+      for (let d=1; d<=dim; d++) {
+        const dateKey = `${y}-${pad2(m)}-${pad2(d)}`;
+        const eff = getDayModeEffective(dateKey);
+        const wd = weekdayJP(parseDate(dateKey));
+        const isWeekly = isWeeklyHolidayAuto(dateKey);
+
+        staffList.forEach(s => {
+          const rec = getRecord(dateKey, s.name);
+          if (!rec || (!rec.in && !rec.out && rec.breakMin == null && rec.excludeMin == null && rec.manualOTMin == null && rec.manualWeekendMin == null && !rec.memo)) return;
+
+          const breakMin = rec.breakMin ?? settings.defaultBreakMin;
+          const excludeMin = rec.excludeMin ?? 0;
+
+          const rawMin = (rec.in && rec.out) ? calcRawMinutes(rec.in, rec.out) : null;
+          const zkMin = (rawMin == null) ? null : Math.max(0, rawMin - (breakMin + excludeMin));
+
+          const stdMin = Math.round((Number(s.standardHours ?? settings.standardHours)) * 60);
+          let otMin = (zkMin == null) ? null : (eff.isWorkday ? Math.max(0, zkMin - stdMin) : zkMin);
+          if (rec.manualOTMin != null && isFinite(rec.manualOTMin)) otMin = rec.manualOTMin;
+
+          let weekendMinAuto = (!eff.isWorkday && isWeekly && zkMin != null) ? zkMin : 0;
+          let weekendMin = weekendMinAuto;
+          if (rec.manualWeekendMin != null && isFinite(rec.manualWeekendMin)) weekendMin = rec.manualWeekendMin;
+
+          rows.push([
+            dateKey,
+            wd,
+            eff.isWorkday ? '勤務日' : '休日（時間外扱い）',
+            eff.label || '',
+            eff.note || '',
+            s.name,
+            rec.in || '',
+            rec.out || '',
+            breakMin ?? 0,
+            excludeMin ?? 0,
+            rawMin == null ? '' : (rawMin/60).toFixed(2),
+            zkMin == null ? '' : (zkMin/60).toFixed(2),
+            otMin == null ? '' : (otMin/60).toFixed(2),
+            (weekendMin/60).toFixed(2),
+            (rec.manualOTMin != null && isFinite(rec.manualOTMin)) ? (rec.manualOTMin/60).toFixed(2) : '',
+            (rec.manualWeekendMin != null && isFinite(rec.manualWeekendMin)) ? (rec.manualWeekendMin/60).toFixed(2) : '',
+            rec.memo || ''
+          ]);
+        });
+      }
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `勤務記録_${ym}`);
+      XLSX.writeFile(wb, `attendance_report_${ym}.xlsx`);
+      showToast("Excelを出力しました");
+    }
+
+    // -------------------------
+    // Overrides table + helper
+    // -------------------------
+    function renderOverridesTable() {
+      const tbody = document.getElementById('override-table-body');
+      const keys = Object.keys(calendarOverrides || {}).sort();
+
+      if (!keys.length) {
+        tbody.innerHTML = `<tr><td class="p-3 text-sm text-gray-500" colspan="5">上書きはありません。</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = keys.map(k => {
+        const ov = calendarOverrides[k];
+        const type = (ov.mode === 'work') ? '勤務日' : '休日（時間外扱い）';
+        return `
+          <tr>
+            <td class="p-3 text-sm">${k}（${weekdayJP(parseDate(k))}）</td>
+            <td class="p-3 text-sm">
+              <span class="text-xs px-2 py-1 rounded-full ${ov.mode==='work'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'} font-bold">${type}</span>
+            </td>
+            <td class="p-3 text-sm text-gray-700">${escapeHTML(ov.label || '')}</td>
+            <td class="p-3 text-sm text-gray-600">${escapeHTML(ov.note || '')}</td>
+            <td class="p-3 text-sm no-print">
+              <button class="px-3 py-2 rounded-xl border hover:bg-gray-50 text-red-600 text-sm" onclick="deleteOverride('${k}')">削除</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function deleteOverride(dateKey) {
+      if (!confirm(`${dateKey} の上書きを削除しますか？`)) return;
+      delete calendarOverrides[dateKey];
+      saveAll();
+      syncDayPanelFromData();
+      renderOverridesTable();
+      renderDailyTable();
+      showToast("上書きを削除しました");
+    }
+
+    function clearAllOverrides() {
+      if (!confirm("上書きを全削除しますか？")) return;
+      calendarOverrides = {};
+      saveAll();
+      syncDayPanelFromData();
+      renderOverridesTable();
+      renderDailyTable();
+      showToast("上書きを全削除しました");
+    }
+
+    function openCalendarHelper() {
+      const d = document.getElementById('target-date').value;
+      document.getElementById('ovDate').value = d || '';
+      document.getElementById('ovType').value = 'work';
+      document.getElementById('ovLabel').value = '';
+      document.getElementById('ovNote').value = '';
+      document.getElementById('calendarHelper').classList.remove('hidden');
+      document.getElementById('calendarHelper').classList.add('flex');
+    }
+    function closeCalendarHelper() {
+      const m = document.getElementById('calendarHelper');
+      m.classList.add('hidden'); m.classList.remove('flex');
+    }
+    function applyOverrideFromHelper() {
+      const date = document.getElementById('ovDate').value;
+      const type = document.getElementById('ovType').value;
+      const label = document.getElementById('ovLabel').value.trim();
+      const note  = document.getElementById('ovNote').value.trim();
+      if (!date) { showToast("日付を入力してください"); return; }
+
+      if (type === 'auto') delete calendarOverrides[date];
+      else calendarOverrides[date] = { mode:type, label, note };
+
+      saveAll();
+      closeCalendarHelper();
+      syncDayPanelFromData();
+      renderOverridesTable();
+      renderDailyTable();
+      showToast("上書きを適用しました");
+    }
+
+    // -------------------------
+    // Edit modal
+    // -------------------------
+    function openEditModal() {
+      const date = document.getElementById('target-date').value;
+      const name = document.getElementById('staff-select').value;
+      if (!date || !name) return;
+
+      const rec = ensureRecord(date, name);
+      const eff = getDayModeEffective(date);
+
+      document.getElementById('editModalSub').textContent =
+        `${date}（${weekdayJP(parseDate(date))}）／${name} ｜ ${eff.isWorkday?'勤務日':'休日（時間外扱い）'}：${eff.reason}`;
+
+      document.getElementById('editIn').value = rec.in || '';
+      document.getElementById('editOut').value = rec.out || '';
+      document.getElementById('editBreak').value = (rec.breakMin ?? settings.defaultBreakMin);
+      document.getElementById('editExclude').value = (rec.excludeMin ?? 0);
+      document.getElementById('editManualOT').value = (rec.manualOTMin != null && isFinite(rec.manualOTMin)) ? (rec.manualOTMin/60).toFixed(2) : '';
+      document.getElementById('editManualWeekend').value = (rec.manualWeekendMin != null && isFinite(rec.manualWeekendMin)) ? (rec.manualWeekendMin/60).toFixed(2) : '';
+      document.getElementById('editMemo').value = rec.memo || '';
+
+      document.getElementById('editModal').classList.remove('hidden');
+      document.getElementById('editModal').classList.add('flex');
+    }
+
+    function closeEditModal() {
+      const m = document.getElementById('editModal');
+      m.classList.add('hidden'); m.classList.remove('flex');
+    }
+
+    function saveEditModal() {
+      const date = document.getElementById('target-date').value;
+      const name = document.getElementById('staff-select').value;
+      if (!date || !name) return;
+
+      const rec = ensureRecord(date, name);
+      rec.in = document.getElementById('editIn').value || '';
+      rec.out = document.getElementById('editOut').value || '';
+      rec.breakMin = clampInt(document.getElementById('editBreak').value, 0, 600);
+      rec.excludeMin = clampInt(document.getElementById('editExclude').value, 0, 600);
+
+      const v = document.getElementById('editManualOT').value;
+      if (v === '' || v == null) rec.manualOTMin = null;
+      else {
+        const h = Number(v);
+        rec.manualOTMin = (isFinite(h) && h >= 0) ? Math.round(h * 60) : null;
+      }
+
+      const w = document.getElementById('editManualWeekend').value;
+      if (w === '' || w == null) rec.manualWeekendMin = null;
+      else {
+        const h = Number(w);
+        rec.manualWeekendMin = (isFinite(h) && h >= 0) ? Math.round(h * 60) : null;
+      }
+
+      rec.memo = (document.getElementById('editMemo').value || '').trim();
+
+      saveAll();
+      syncDayPanelFromData();
+      renderDailyTable();
+      if (!document.getElementById('section-dashboard').classList.contains('hidden')) updateCharts();
+      closeEditModal();
+      showToast("保存しました");
+    }
+
+    function deleteOneRecord() {
+      const date = document.getElementById('target-date').value;
+      const name = document.getElementById('staff-select').value;
+      if (!date || !name) return;
+      if (!confirm("この職員のこの日の記録を削除しますか？")) return;
+
+      if (attendanceData[date]) {
+        delete attendanceData[date][name];
+        if (Object.keys(attendanceData[date]).length === 0) delete attendanceData[date];
+      }
+
+      saveAll();
+      syncDayPanelFromData();
+      renderDailyTable();
+      if (!document.getElementById('section-dashboard').classList.contains('hidden')) updateCharts();
+      closeEditModal();
+      showToast("削除しました");
+    }
+
+    function modalNow(kind) {
+      const now = new Date();
+      const t = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+      if (kind === 'in') document.getElementById('editIn').value = t;
+      else document.getElementById('editOut').value = t;
+    }
+
+    function modalShift(kind, deltaMin) {
+      const el = (kind === 'in') ? document.getElementById('editIn') : document.getElementById('editOut');
+      const v = el.value;
+      if (!v) return;
+      const p = parseTime(v);
+      if (!p) return;
+      let total = p.h * 60 + p.m + deltaMin;
+      total = (total + 24*60) % (24*60);
+      el.value = pad2(Math.floor(total/60)) + ':' + pad2(total%60);
+    }
+
+    // -------------------------
+    // Settings/reset
+    // -------------------------
+    function saveSettings() {
+      settings.standardHours = Number(document.getElementById('std-hours').value) || DEFAULT_SETTINGS.standardHours;
+      settings.viewMode = document.getElementById('view-mode').value || 'total';
+      saveAll();
+      showToast("設定を保存しました");
+    }
+
+    function hardResetAll() {
+      if (!confirm("全データを初期化しますか？（戻せません）")) return;
+
+      staffList = [{ name:"管理者", standardHours: DEFAULT_SETTINGS.standardHours }];
+      attendanceData = {};
+      calendarOverrides = {};
+      settings = { ...DEFAULT_SETTINGS, avgStaffSelected:[ "管理者" ] };
+
+      saveAll();
+      renderStaffOptions();
+      syncDayPanelFromData();
+      renderDailyTable();
+      renderOverridesTable();
+      if (mainChart) updateCharts();
+      showToast("初期化しました");
+    }
+
+    // -------------------------
+    // Backup/restore
+    // -------------------------
+    function exportBackupJSON() {
+      const payload = { version:4, exportedAt:new Date().toISOString(), staffList, attendanceData, calendarOverrides, settings };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type:"application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `working_hours_backup_${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast("バックアップを作成しました");
+    }
+
+    function importBackupJSON(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const obj = JSON.parse(reader.result);
+          if (!confirm("バックアップを復元しますか？（現在のデータは上書きされます）")) return;
+
+          staffList = Array.isArray(obj.staffList) ? obj.staffList : staffList;
+          attendanceData = obj.attendanceData || {};
+          calendarOverrides = obj.calendarOverrides || {};
+          settings = obj.settings || settings;
+
+          saveAll();
+          renderStaffOptions();
+          syncDayPanelFromData();
+          renderDailyTable();
+          renderOverridesTable();
+          if (mainChart) updateCharts();
+          showToast("復元しました");
+        } catch (e) {
+          showToast("復元に失敗しました（JSONを確認）");
+        } finally {
+          event.target.value = "";
         }
+      };
+      reader.readAsText(file);
+    }
 
-        // --- タブ切り替え ---
-        function switchTab(tab) {
-            ['stamping', 'dashboard', 'settings'].forEach(t => {
-                document.getElementById(`section-${t}`).classList.add('hidden');
-                document.getElementById(`tab-${t}`).classList.remove('tab-active', 'text-blue-600');
-                document.getElementById(`tab-${t}`).classList.add('text-gray-500');
-            });
-            document.getElementById(`section-${tab}`).classList.remove('hidden');
-            document.getElementById(`tab-${tab}`).classList.add('tab-active', 'text-blue-600');
-            
-            if(tab === 'dashboard') updateCharts();
-        }
+    // -------------------------
+    // Data helpers
+    // -------------------------
+    function saveAll() {
+      localStorage.setItem(LS_KEYS.staff, JSON.stringify(staffList));
+      localStorage.setItem(LS_KEYS.attendance, JSON.stringify(attendanceData));
+      localStorage.setItem(LS_KEYS.overrides, JSON.stringify(calendarOverrides));
+      localStorage.setItem(LS_KEYS.settings, JSON.stringify(settings));
+    }
 
-        // --- 職員管理 ---
-        function renderStaffOptions() {
-            const select = document.getElementById('staff-select');
-            const chartSelect = document.getElementById('individual-chart-select');
-            const list = document.getElementById('staff-list');
-            
-            const options = staffList.map(name => `<option value="${name}">${name}</option>`).join('');
-            select.innerHTML = options;
-            chartSelect.innerHTML = options;
-            
-            list.innerHTML = staffList.map((name, index) => `
-                <li class="bg-gray-100 p-2 rounded flex justify-between items-center text-sm">
-                    ${name}
-                    <button onclick="removeStaff(${index})" class="text-red-500 hover:text-red-700">×</button>
-                </li>
-            `).join('');
-        }
+    function loadJSON(key, fallback) {
+      try {
+        const s = localStorage.getItem(key);
+        if (!s) return fallback;
+        return JSON.parse(s);
+      } catch (e) { return fallback; }
+    }
 
-        function addStaff() {
-            const input = document.getElementById('new-staff-name');
-            const name = input.value.trim();
-            if (name && staffList.length < 50) {
-                staffList.push(name);
-                saveData();
-                renderStaffOptions();
-                input.value = '';
-                showToast("職員を追加しました");
-            } else if(staffList.length >= 50) {
-                showToast("最大50名までです");
+    function ensureRecord(date, name) {
+      if (!attendanceData[date]) attendanceData[date] = {};
+      if (!attendanceData[date][name]) attendanceData[date][name] = {
+        in:'', out:'',
+        breakMin:null, excludeMin:null,
+        manualOTMin:null, manualWeekendMin:null,
+        memo:''
+      };
+      return attendanceData[date][name];
+    }
+
+    function getRecord(date, name) {
+      return attendanceData?.[date]?.[name] || null;
+    }
+
+    // -------------------------
+    // Time calc
+    // -------------------------
+    function calcRawMinutes(inTime, outTime) {
+      if (!inTime || !outTime) return null;
+      const s = parseTime(inTime);
+      const e = parseTime(outTime);
+      if (!s || !e) return null;
+
+      let start = s.h*60 + s.m;
+      let end = e.h*60 + e.m;
+      if (end < start) end += 24*60; // overnight
+      return Math.max(0, end - start);
+    }
+
+    function parseTime(t) {
+      const m = /^(\d{2}):(\d{2})$/.exec(t);
+      if (!m) return null;
+      const h = Number(m[1]), mi = Number(m[2]);
+      if (h<0||h>23||mi<0||mi>59) return null;
+      return { h, m:mi };
+    }
+
+    function isWeeklyHolidayAuto(dateStr) {
+      const dt = parseDate(dateStr);
+      const dow = dt.getDay();
+      return (dow === 0 || dow === 6); // 土日
+    }
+
+    // -------------------------
+    // Japanese Holidays (general)
+    // -------------------------
+    function isJapaneseHoliday(dateObj) {
+      const y = dateObj.getFullYear();
+      const m = dateObj.getMonth()+1;
+      const d = dateObj.getDate();
+      const holidays = buildHolidaysForYear(y);
+      return holidays.has(`${y}-${pad2(m)}-${pad2(d)}`);
+    }
+
+    function buildHolidaysForYear(y) {
+      if (!buildHolidaysForYear.cache) buildHolidaysForYear.cache = {};
+      if (buildHolidaysForYear.cache[y]) return buildHolidaysForYear.cache[y];
+
+      const set = new Set();
+      add(set,y,1,1);
+      add(set,y,2,11);
+      if (y >= 2020) add(set,y,2,23);
+      add(set,y,4,29);
+      add(set,y,5,3); add(set,y,5,4); add(set,y,5,5);
+      if (y >= 2016) add(set,y,8,11);
+      add(set,y,11,3); add(set,y,11,23);
+
+      add(set,y,1, nthWeekdayOfMonth(y,1,1,2));
+      add(set,y,7, nthWeekdayOfMonth(y,7,1,3));
+      add(set,y,9, nthWeekdayOfMonth(y,9,1,3));
+      add(set,y,10, nthWeekdayOfMonth(y,10,1,2));
+
+      add(set,y,3, vernalEquinoxDay(y));
+      add(set,y,9, autumnalEquinoxDay(y));
+
+      // substitute holiday (simple)
+      for (let month=1; month<=12; month++) {
+        const dim = daysInMonth(y, month);
+        for (let day=1; day<=dim; day++) {
+          const key = `${y}-${pad2(month)}-${pad2(day)}`;
+          if (!set.has(key)) continue;
+          const dt = new Date(y, month-1, day);
+          if (dt.getDay() === 0) {
+            for (let i=1; i<=7; i++) {
+              const dt2 = addDays(dt, i);
+              const k2 = toYMD(dt2);
+              if (!set.has(k2)) { set.add(k2); break; }
             }
+          }
         }
+      }
 
-        function removeStaff(index) {
-            if(confirm("この職員を削除しますか？（記録は残ります）")) {
-                staffList.splice(index, 1);
-                saveData();
-                renderStaffOptions();
-            }
+      // citizen holiday
+      for (let month=1; month<=12; month++) {
+        const dim = daysInMonth(y, month);
+        for (let day=1; day<=dim; day++) {
+          const dt = new Date(y, month-1, day);
+          const key = toYMD(dt);
+          if (set.has(key)) continue;
+          const prev = toYMD(addDays(dt,-1));
+          const next = toYMD(addDays(dt, 1));
+          if (set.has(prev) && set.has(next)) set.add(key);
         }
+      }
 
-        // --- 出退勤記録 ---
-        function recordStamping(type) {
-            const name = document.getElementById('staff-select').value;
-            const date = document.getElementById('target-date').value;
-            const now = new Date();
-            const time = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+      buildHolidaysForYear.cache[y] = set;
+      return set;
+    }
 
-            if (!attendanceData[date]) attendanceData[date] = {};
-            if (!attendanceData[date][name]) attendanceData[date][name] = { in: "", out: "" };
+    function add(set,y,m,d){ set.add(`${y}-${pad2(m)}-${pad2(d)}`); }
+    function nthWeekdayOfMonth(y,m,weekday,nth){
+      const first = new Date(y, m-1, 1);
+      const offset = (weekday - first.getDay() + 7) % 7;
+      return 1 + offset + 7*(nth-1);
+    }
+    function vernalEquinoxDay(y){
+      return Math.floor(20.8431 + 0.242194*(y-1980) - Math.floor((y-1980)/4));
+    }
+    function autumnalEquinoxDay(y){
+      return Math.floor(23.2488 + 0.242194*(y-1980) - Math.floor((y-1980)/4));
+    }
 
-            attendanceData[date][name][type] = time;
-            
-            saveData();
-            renderDailyTable();
-            showToast(`${name}さん: ${type === 'in' ? '出勤' : '退勤'}を記録しました`);
-        }
-
-        function renderDailyTable() {
-            const date = document.getElementById('target-date').value;
-            const tbody = document.getElementById('daily-table-body');
-            const dayData = attendanceData[date] || {};
-
-            tbody.innerHTML = staffList.map(name => {
-                const data = dayData[name] || { in: "", out: "" };
-                let diffStr = "-";
-                let overStr = "-";
-
-                if (data.in && data.out) {
-                    const diff = calculateHours(data.in, data.out);
-                    diffStr = diff.toFixed(2) + "h";
-                    const over = Math.max(0, diff - STANDARD_HOURS);
-                    overStr = over > 0 ? `<span class="text-red-600 font-bold">${over.toFixed(2)}h</span>` : "0.00h";
-                }
-
-                return `
-                    <tr>
-                        <td class="p-3 text-sm border-b">${name}</td>
-                        <td class="p-3 text-sm border-b">${data.in || '---'}</td>
-                        <td class="p-3 text-sm border-b">${data.out || '---'}</td>
-                        <td class="p-3 text-sm border-b">${diffStr}</td>
-                        <td class="p-3 text-sm border-b">${overStr}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function calculateHours(start, end) {
-            const s = start.split(':').map(Number);
-            const e = end.split(':').map(Number);
-            const diffMin = (e[0] * 60 + e[1]) - (s[0] * 60 + s[1]);
-            return diffMin / 60;
-        }
-
-        // --- グラフ・集計 ---
-        let mainChart, individualChart;
-
-        function initCharts() {
-            const ctxMain = document.getElementById('mainChart').getContext('2d');
-            mainChart = new Chart(ctxMain, {
-                type: 'bar',
-                data: { labels: [], datasets: [{ label: '総時間外時間', data: [], backgroundColor: '#3b82f6' }] },
-                options: { responsive: true }
-            });
-
-            const ctxIndiv = document.getElementById('individualChart').getContext('2d');
-            individualChart = new Chart(ctxIndiv, {
-                type: 'line',
-                data: { labels: [], datasets: [{ label: '個人の時間外', data: [], borderColor: '#ef4444', tension: 0.1 }] },
-                options: { responsive: true }
-            });
-        }
-
-        function updateCharts() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = (now.getMonth() + 1).toString().padStart(2, '0');
-            
-            // 全体集計
-            const labels = [];
-            const totals = [];
-            for(let i=1; i<=31; i++) {
-                const d = `${year}-${month}-${i.toString().padStart(2, '0')}`;
-                if (i > new Date(year, now.getMonth() + 1, 0).getDate()) break;
-                labels.push(i + "日");
-                
-                let dayTotalOver = 0;
-                if(attendanceData[d]) {
-                    Object.values(attendanceData[d]).forEach(entry => {
-                        if(entry.in && entry.out) {
-                            dayTotalOver += Math.max(0, calculateHours(entry.in, entry.out) - STANDARD_HOURS);
-                        }
-                    });
-                }
-                totals.push(dayTotalOver);
-            }
-            
-            mainChart.data.labels = labels;
-            mainChart.data.datasets[0].data = totals;
-            mainChart.update();
-            
-            updateIndividualChart();
-        }
-
-        function updateIndividualChart() {
-            const name = document.getElementById('individual-chart-select').value;
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = (now.getMonth() + 1).toString().padStart(2, '0');
-            const data = [];
-            const labels = [];
-
-            for(let i=1; i<=31; i++) {
-                const d = `${year}-${month}-${i.toString().padStart(2, '0')}`;
-                if (i > new Date(year, now.getMonth() + 1, 0).getDate()) break;
-                labels.push(i);
-                
-                let val = 0;
-                if(attendanceData[d] && attendanceData[d][name]) {
-                    const entry = attendanceData[d][name];
-                    if(entry.in && entry.out) val = Math.max(0, calculateHours(entry.in, entry.out) - STANDARD_HOURS);
-                }
-                data.push(val);
-            }
-
-            individualChart.data.labels = labels;
-            individualChart.data.datasets[0].data = data;
-            individualChart.data.datasets[0].label = `${name}さんの時間外`;
-            individualChart.update();
-        }
-
-        // --- 外部出力 ---
-        function exportToExcel() {
-            const rows = [['日付', '氏名', '出勤', '退勤', '在校時間', '時間外']];
-            const sortedDates = Object.keys(attendanceData).sort();
-            
-            sortedDates.forEach(date => {
-                staffList.forEach(name => {
-                    const d = attendanceData[date][name];
-                    if(d && (d.in || d.out)) {
-                        const diff = (d.in && d.out) ? calculateHours(d.in, d.out) : 0;
-                        const over = Math.max(0, diff - STANDARD_HOURS);
-                        rows.push([date, name, d.in, d.out, diff.toFixed(2), over.toFixed(2)]);
-                    }
-                });
-            });
-
-            const ws = XLSX.utils.aoa_to_sheet(rows);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "勤務記録");
-            XLSX.writeFile(wb, `attendance_report_${new Date().toISOString().slice(0,7)}.xlsx`);
-        }
-
-        // --- ユーティリティ ---
-        function saveData() {
-            localStorage.setItem('staffList', JSON.stringify(staffList));
-            localStorage.setItem('attendanceData', JSON.stringify(attendanceData));
-        }
-
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.innerText = msg;
-            t.classList.remove('opacity-0');
-            setTimeout(() => t.classList.add('opacity-0'), 3000);
-        }
-    </script>
+    // -------------------------
+    // Utils
+    // -------------------------
+    function showToast(msg){
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.classList.remove('opacity-0');
+      setTimeout(()=>t.classList.add('opacity-0'), 2600);
+    }
+    function pad2(n){ return String(n).padStart(2,'0'); }
+    function parseDate(ymd){ const [y,m,d] = ymd.split('-').map(Number); return new Date(y, m-1, d); }
+    function toYMD(dt){ return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())}`; }
+    function toYM(dt){ return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}`; }
+    function addDays(dt,n){ const x = new Date(dt); x.setDate(x.getDate()+n); return x; }
+    function daysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
+    function weekdayJP(dt){ return ["日","月","火","水","木","金","土"][dt.getDay()]; }
+    function clampInt(v,min,max){ const n = Math.round(Number(v)); if(!isFinite(n)) return min; return Math.max(min, Math.min(max,n)); }
+    function escapeHTML(str){
+      return String(str).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+    }
+    function escapeAttr(str){ return String(str).replaceAll("\\","\\\\").replaceAll("'","\\'"); }
+  </script>
 </body>
 </html>
