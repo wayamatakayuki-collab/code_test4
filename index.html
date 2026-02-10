@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>在校等時間管理 (v01)</title>
+  <title>在校等時間管理</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -28,6 +28,9 @@
     .card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
     .tab-btn{ padding:.6rem .9rem; border-bottom:2px solid transparent; font-weight:700; color:var(--muted); }
     .tab-btn.active{ color:var(--brand); border-bottom-color:var(--brand); }
+
+    /* 管理者専用UIはログインまで非表示（ロード中の一瞬の表示も防止） */
+    [data-admin-only="1"]{ display:none; }
     .chip{ display:inline-flex; align-items:center; gap:.35rem; border:1px solid var(--line); border-radius:999px; padding:.25rem .55rem; font-size:.8rem; background:#fff; }
 
 .chip{ cursor:pointer; user-select:none; }
@@ -113,6 +116,36 @@
             .staffPickBtn:not(.staffState-in):not(.staffState-out) .mono{ color:#475569; }
             .staffPickBtn.active:not(.staffState-in):not(.staffState-out){ background:#fff !important; border-color: rgba(37,99,235,.35) !important; color:#0f172a !important; }
             .staffPickBtn.active:not(.staffState-in):not(.staffState-out) .mono{ color:#475569 !important; }
+
+            /* 職員選択モーダル：横6人（6×5=30名はスクロールなし） */
+            .staffPickGrid{
+              display:grid;
+              grid-template-columns: repeat(6, minmax(0,1fr));
+              gap:.35rem;
+              max-height: calc(5 * 68px + 4 * .35rem);
+              overflow-y: auto;
+              padding-right: 2px;
+            }
+            @media (max-width: 980px){
+              .staffPickGrid{ grid-template-columns: repeat(4, minmax(0,1fr)); max-height: calc(5 * 68px + 4 * .35rem); }
+            }
+            @media (max-width: 640px){
+              .staffPickGrid{ grid-template-columns: repeat(3, minmax(0,1fr)); max-height: calc(6 * 68px + 5 * .35rem); }
+            }
+            .staffPickBtn{ min-height: 68px; padding: .45rem .55rem; }
+            .staffPickName{
+              white-space: normal;
+              line-height: 1.15;
+              word-break: keep-all;
+            }
+            .staffPickBtn .mono{ font-size: .72rem; }
+
+
+    /* 職員選択ボタン：30名が1画面に収まる密度 */
+    .staffPickBtn{ padding: .42rem .55rem !important; border-radius: 14px !important; }
+    .staffPickBtn .font-black{ font-size: .92rem; }
+    .staffPickBtn .small{ font-size: .72rem; }
+
     .small{ font-size:.82rem; color:var(--muted); }
     .sticky-head thead th{ position: sticky; top: 0; background: #f8fafc; z-index: 2; }
     @media print{
@@ -172,7 +205,31 @@
 
 
 #toast{z-index:1000000;}
-</style>
+
+/* Staff drag sort */
+.dragHandle{
+  display:inline-flex;
+  width: 2.1rem;
+  height: 2.1rem;
+  align-items:center;
+  justify-content:center;
+  border:1px solid var(--line);
+  border-radius: 12px;
+  background: var(--soft2);
+  cursor: grab;
+  user-select:none;
+  font-weight:900;
+  color: var(--muted);
+}
+tr.is-dragging{ opacity:.55; }
+tr.is-drop-target{ outline: 2px solid rgba(37,99,235,.35); outline-offset:-2px; }
+
+    /* --- minimal utilities (works even if Tailwind CDN is blocked) --- */
+    .hidden{ display:none !important; }
+    .opacity-0{ opacity:0 !important; }
+    .pointer-events-none{ pointer-events:none !important; }
+
+  </style>
 </head>
 
 <body class="min-h-screen bg-grad">
@@ -201,18 +258,23 @@
           <div class="mono text-lg md:text-xl font-black text-slate-700 whitespace-nowrap" id="nowDate">----/--/-- (---)</div>
           <div class="mono text-3xl md:text-4xl font-black text-blue-600 whitespace-nowrap leading-none" id="nowTime">--:--:--</div>
         </div>
-        <button class="btn btn-ghost no-print" onclick="openHelp()">使い方</button>
+        <div class="flex items-center gap-2 no-print">
+          <button id="adminLoginBtn" class="btn btn-ghost" onclick="adminToggle()" type="button">管理者ログイン</button>
+          <span id="modeBadge" class="pill hidden">管理者モード</span>
+          <button class="btn btn-ghost" onclick="goBackInApp()" type="button">戻る</button>
+          <button class="btn btn-ghost" onclick="openHelp()" type="button">使い方</button>
+        </div>
       </div>
     </header>
 
     <!-- Tabs -->
     <div class="no-print card px-3 py-2 mb-4">
       <div class="flex flex-wrap gap-2">
-        <button class="tab-btn active" id="tab-input" onclick="switchTab('input')">入力</button>
-        <button class="tab-btn" id="tab-calendar" onclick="switchTab('calendar')">カレンダー</button>
-        <button class="tab-btn" id="tab-overview" onclick="switchTab('overview')">月別 全体一覧</button>
-        <button class="tab-btn" id="tab-individual" onclick="switchTab('individual')">月別 個別一覧</button>
-        <button class="tab-btn" id="tab-settings" onclick="switchTab('settings')">設定・出力</button>
+        <button class="tab-btn active" id="tab-input" onclick="switchTab('input')" type="button">入力</button>
+        <button class="tab-btn" id="tab-calendar" onclick="switchTab('calendar')" type="button">カレンダー</button>
+        <button class="tab-btn" id="tab-overview" onclick="switchTab('overview')" type="button">月別 全体一覧</button>
+        <button class="tab-btn" id="tab-individual" onclick="switchTab('individual')" type="button">月別 個別一覧</button>
+        <button class="tab-btn" id="tab-settings" data-admin-only="1" style="display:none" onclick="switchTab('settings')" type="button">設定・出力</button>
       </div>
     </div>
 
@@ -224,7 +286,7 @@
             <div class="md:col-span-4">
               <label class="block text-sm font-black mb-1">職員</label>
               <button id="inpStaffBtn" class="input text-left w-full" onclick="openStaffPicker()" type="button">
-                <span class="font-black" id="inpStaffName">—</span>
+                <span class="font-black" id="inpStaffName">職員名を選択</span>
                 <span class="small ml-2">（タップして選択）</span>
               </button>
               <input type="hidden" id="inpStaffId" value="">
@@ -241,7 +303,7 @@
             </div>
 
             <div class="md:col-span-4">
-              <label class="block text-sm font-black mb-1">職名</label>
+              <label class="block text-sm font-black mb-1">勤務区分</label>
               <div class="flex items-center justify-between gap-2">
                 <div id="inpDayBadge" class="text-sm"></div>
                 <button class="btn btn-ghost" onclick="openEditModal()" type="button">編集</button>
@@ -252,14 +314,14 @@
           <!-- 最速入力：2ボタン + 業務外 -->
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
             <div class="md:col-span-4">
-              <button class="btn btn-primary h-14 w-full text-lg font-black" onclick="quickStamp('in')" type="button">出勤（今）</button>
+              <button class="btn btn-primary h-20 w-full text-2xl md:text-3xl font-black" onclick="quickStamp('in')" type="button">出 勤（今）</button>
             </div>
             <div class="md:col-span-4">
-              <button class="btn btn-danger h-14 w-full text-lg font-black" onclick="quickStamp('out')" type="button">退勤（今）</button>
+              <button class="btn btn-danger h-20 w-full text-2xl md:text-3xl font-black" onclick="quickStamp('out')" type="button">退 勤（今）</button>
             </div>
             <div class="md:col-span-4">
               <label class="block text-sm font-black mb-1">業務外（時間）</label>
-              <input id="inpOtherOff" type="text" class="input mono" placeholder="例: 0:30 / 0.5" onblur="saveOtherOff()" />
+              <input id="inpOtherOff" type="text" class="input mono" placeholder="例: 0:30 / 0.5" onblur="normalizeHalfInput(this);saveOtherOff()" />
               <div class="small mt-1 text-slate-500">※休憩45分とは別に、業務外の時間を入力します。</div>
             </div>
           </div>
@@ -293,21 +355,55 @@
               </tbody>
             </table>
           </div>
-<div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-  <div class="card p-4">
-    <div class="text-sm font-black mb-1">入力は3つだけ</div>
-    <div class="small text-slate-600 leading-relaxed">出勤・退勤・業務外（必要な日だけ）</div>
+<div class="mt-3 grid grid-cols-1 lg:grid-cols-12 gap-3">
+  <div class="card p-4 lg:col-span-8">
+    <div class="flex items-center justify-between gap-3">
+      <div class="text-sm font-black">残り（当月合計）</div>
+      <div class="small text-slate-600">時間外在校等時間（合計）に対して</div>
+    </div>
+
+    <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-black">基準① <span class="mono font-black" id="remCap1HLabel">--</span>時間まで</div>
+          <div class="small text-slate-600">残り</div>
+        </div>
+        <div class="mt-1 text-2xl font-black mono" id="remToGoal">--:--</div>
+        <div class="mt-2 h-2 bg-white rounded-full overflow-hidden border border-slate-200">
+          <div id="remBarGoal" class="h-2" style="width:0%; background: var(--brand);"></div>
+        </div>
+        <div class="mt-1 flex justify-between small text-slate-600">
+          <span id="usedGoal">--:--</span><span id="capGoal">--:--</span>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-black">基準② <span class="mono font-black" id="remCap2HLabel">--</span>時間まで</div>
+          <div class="small text-slate-600">残り</div>
+        </div>
+        <div class="mt-1 text-2xl font-black mono" id="remTo80">--:--</div>
+        <div class="mt-2 h-2 bg-white rounded-full overflow-hidden border border-slate-200">
+          <div id="remBar80" class="h-2" style="width:0%; background: rgba(239,68,68,.55);"></div>
+        </div>
+        <div class="mt-1 flex justify-between small text-slate-600">
+          <span id="used80">--:--</span><span id="cap80">--:--</span>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="card p-4">
-    <div class="text-sm font-black mb-1">在校等時間</div>
-    <div class="small text-slate-600 leading-relaxed">在校時間（退勤−出勤）− 休憩（休憩: <span class="mono" id="miniBreak">--</span>）− 業務外</div>
-  </div>
-  <div class="card p-4">
-    <div class="text-sm font-black mb-1">時間外在校等時間</div>
-    <div class="small text-slate-600 leading-relaxed">勤務日：在校等−7時間45分 ／ 週休日：在校等（=時間外）</div>
+
+  <div class="card p-4 lg:col-span-4">
+    <div class="text-sm font-black mb-2">在校等時間</div>
+    <div class="small text-slate-700 leading-relaxed">
+      <div class="mono">在校時間（退勤−出勤）− 休憩（ <span class="mono" id="miniBreak">--</span>）− 業務外</div>
+
+      <div class="mt-4 text-sm font-black text-slate-800">時間外在校等時間</div>
+      <div class="mt-1 mono">勤務日：在校等時間−7時間45分</div>
+      <div class="mono">週休日：在校時間</div>
+    </div>
   </div>
 </div>
-<div class="small text-slate-500 mt-2">※「業務外（除く）」の入力・理由の選択は、<b>月別 個別一覧</b>の各日「業務外」から行います。</div>
 
           <!-- hidden time inputs (kept for internal storage) -->
           <input id="inpIn" type="time" class="hidden" />
@@ -522,7 +618,7 @@
     </section>
 
     <!-- SETTINGS -->
-    <section id="section-settings" class="hidden space-y-4">
+    <section id="section-settings" class="hidden space-y-4" data-admin-only="1" style="display:none">
       <div class="card p-5">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
@@ -532,6 +628,7 @@
           <div class="flex flex-wrap gap-2">
             <button class="btn btn-ghost" onclick="backupJSON()">バックアップ(JSON)</button>
             <button class="btn btn-ghost" onclick="restoreJSON()">復元(JSON)</button>
+            <button class="btn btn-ghost" onclick="restoreAutoBackup()">自動バックアップから復元</button>
             <button class="btn btn-danger" onclick="resetAll()">全データ初期化</button>
           </div>
         </div>
@@ -566,7 +663,40 @@
       </div>
 
       <div class="card p-5">
-        <h3 class="font-black mb-2">職員（最大50名）</h3>
+        <h3 class="font-black mb-2">点検（提出前チェック）</h3>
+        <div class="small text-slate-600">当月の <b>未入力</b> / <b>逆転</b> / <b>業務外の形式</b> をまとめて確認できます。</div>
+        <div class="mt-3 flex flex-wrap gap-2 items-center">
+          <button class="btn btn-ghost" onclick="runMonthlyAudit()" type="button">当月点検を開く</button>
+        </div>
+      </div>
+
+<div class="card p-5" data-admin-only="1">
+  <h3 class="font-black mb-2">管理者パスワード</h3>
+  <div class="small text-slate-600 mb-3">初期パスワードは <span class="mono">admin</span> です（変更後はこの端末・このブラウザに保存されます）。</div>
+  <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+    <div class="md:col-span-4">
+      <label class="block text-sm font-bold mb-1">新しいパスワード</label>
+      <input id="adminPassNew" type="password" class="input w-full" placeholder="新しいパスワード" />
+    </div>
+    <div class="md:col-span-4">
+      <label class="block text-sm font-bold mb-1">確認</label>
+      <input id="adminPassNew2" type="password" class="input w-full" placeholder="もう一度入力" />
+    </div>
+    <div class="md:col-span-4">
+      <button class="btn btn-primary w-full" onclick="changeAdminPass()" type="button">変更して保存</button>
+    </div>
+  </div>
+</div>
+
+
+      <div class="card p-5">
+        <h3 class="font-black mb-2">職員（上限なし）</h3>
+        <div class="flex flex-wrap gap-2 items-center mb-3">
+          <button class="btn btn-primary" onclick="downloadStaffExcel()" type="button">⬇ 職員名簿ダウンロード</button>
+          <button class="btn btn-ok" onclick="triggerStaffImport()" type="button">⬆ 職員名簿アップロード</button>
+          <input id="staffImportFile" type="file" accept=".csv,.xls,.xml,.xlsx" class="hidden" />
+          <span class="small text-slate-500">※対応: CSV（DL/UP） / .xls/.xlsx（UP）</span>
+        </div>
         
 
         <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
@@ -603,10 +733,11 @@
           <table class="w-full text-left sticky-head table-zebra">
             <thead>
               <tr>
-                <th class="p-3 text-xs font-black">No</th>
-                <th class="p-3 text-xs font-black">氏名</th>
-                <th class="p-3 text-xs font-black">職名</th>
-                <th class="p-3 text-xs font-black no-print">操作</th>
+                <th class="p-3 text-xs font-black text-center">No</th>
+                <th class="p-3 text-xs font-black text-center">氏名</th>
+                <th class="p-3 text-xs font-black text-center">職名</th>
+                <th class="p-3 text-xs font-black no-print text-center">操作</th>
+                <th class="p-3 text-xs font-black no-print text-center">並替</th>
               </tr>
             </thead>
             <tbody id="staffBody" class="divide-y divide-gray-100"></tbody>
@@ -641,6 +772,19 @@
         <label class="small font-black text-slate-700">目標（時間外・月）</label>
         <input id="setGoalOverH" type="number" min="0" max="9999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200" />
         <div class="small text-slate-500 mt-1">※目標はレポート内の表示（目標/今月/差）に使います。</div>
+        <div class="mt-4 grid grid-cols-1 gap-3">
+          <div>
+            <label class="small font-black text-slate-700">残り表示①（時間）</label>
+            <input id="setRemCap1H" type="number" min="0" max="9999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            <div class="small text-slate-500 mt-1">※入力タブ「残り（当月合計）」の基準①</div>
+          </div>
+          <div>
+            <label class="small font-black text-slate-700">残り表示②（時間）</label>
+            <input id="setRemCap2H" type="number" min="0" max="9999" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            <div class="small text-slate-500 mt-1">※入力タブ「残り（当月合計）」の基準②</div>
+          </div>
+        </div>
+
       </div>
 
       <div class="md:col-span-4">
@@ -777,7 +921,7 @@
 
     <!-- Modal -->
     <div id="modalWrap" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50 no-print">
-      <div class="card max-w-2xl w-full p-5">
+      <div id="modalCard" class="card max-w-2xl w-full p-5">
         <div class="flex items-start justify-between gap-3">
           <div>
             <div class="text-lg font-black" id="modalTitle">—</div>
@@ -849,6 +993,8 @@ const DEFAULT_SETTINGS = {
     ],
 
 goalOverH: 45,
+  remCap1H: 45,
+  remCap2H: 80,
 
   // 目標達成度（%差で判定）※表示はランク＋英単語
   goalRankCfg: [
@@ -1069,16 +1215,23 @@ let charts = { monthOver:null, dailyTotal:null };
    Utilities
    ========================= */
 function uid(){ return "id-" + Math.random().toString(16).slice(2) + "-" + Date.now().toString(16); }
-function saveAll(){ save(STORE.settings, settings); save(STORE.staff, staff); save(STORE.calendar, calendar); save(STORE.records, records); }
+function saveAll(){ save(STORE.settings, settings); save(STORE.staff, staff); save(STORE.calendar, calendar); save(STORE.records, records); save(STORE.viewYM, viewYM); autoBackup(); }
 function save(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
 function load(key, fallback){
   try{ const v = JSON.parse(localStorage.getItem(key)); return (v ?? fallback); }catch{ return fallback; }
 }
 function toast(msg){
   const t = document.getElementById("toast");
+  if(!t){ try{ console.log(msg); }catch(e){} return; }
   t.textContent = msg;
+  // class と style の両方で制御（Tailwindが無い環境でも動作）
   t.classList.remove("opacity-0");
-  setTimeout(()=>t.classList.add("opacity-0"), 2600);
+  t.style.opacity = "1";
+  if(t._toastTimer) clearTimeout(t._toastTimer);
+  t._toastTimer = setTimeout(()=>{
+    t.classList.add("opacity-0");
+    t.style.opacity = "0";
+  }, 2600);
 }
 function showToast(msg){ toast(msg); }
 function pad2(n){ return String(n).padStart(2,"0"); }
@@ -1086,6 +1239,316 @@ function dateKeyFromParts(y,m,d){ return `${y}-${pad2(m)}-${pad2(d)}`; }
 function todayKeyLocal(){
   const now = new Date();
   return dateKeyFromParts(now.getFullYear(), now.getMonth()+1, now.getDate());
+}
+
+// ===== 文字の半角整形（全角→半角） =====
+function toHalfWidth(str){
+  if(str===undefined || str===null) return "";
+  return str.toString()
+    .replace(/[！-～]/g, s=>String.fromCharCode(s.charCodeAt(0)-0xFEE0))
+    .replace(/　/g, " ")
+    .replace(/[：]/g, ":")
+    .replace(/[－―]/g, "-")
+    .replace(/[（）]/g, c=>({"（":"(","）":")"}[c]||c))
+    .trim();
+}
+function normalizeHalfInput(el){
+  if(!el) return;
+  const v = el.value;
+  const nv = toHalfWidth(v);
+  if(nv!==v) el.value = nv;
+}
+
+// ===== 自動バックアップ =====
+const STORE_AUTO_BACKUP = "wh.autobackup.v1";
+function autoBackup(){
+  try{
+    const payload = { settings, viewYM, staff, calendar, records, savedAt: new Date().toISOString() };
+    localStorage.setItem(STORE_AUTO_BACKUP, JSON.stringify(payload));
+  }catch(e){}
+}
+function restoreAutoBackup(){
+  try{
+    const raw = localStorage.getItem(STORE_AUTO_BACKUP);
+    if(!raw){ toast("自動バックアップが見つかりません"); return; }
+    const obj = JSON.parse(raw);
+    if(obj.settings) settings = obj.settings;
+    if(obj.viewYM) viewYM = obj.viewYM;
+    if(obj.staff) staff = obj.staff;
+    if(obj.calendar) calendar = obj.calendar;
+    if(obj.records) records = obj.records;
+    saveAll();
+    toast("自動バックアップから復元しました");
+    hydrateSettingsUI();
+    renderDaily(); renderCalendar(); renderOverview(); renderIndividual();
+    updateCharts();
+
+  }catch(e){
+    toast("自動バックアップの復元に失敗しました");
+  }
+}
+
+
+function changeAdminPass(){
+  if(!isAdminMode()){ openAdminLogin(); return; }
+  const a = document.getElementById("adminPassNew");
+  const b = document.getElementById("adminPassNew2");
+  const p1 = a ? String(a.value||"") : "";
+  const p2 = b ? String(b.value||"") : "";
+  if(!p1){ toast("新しいパスワードを入力してください"); return; }
+  if(p1 !== p2){ toast("確認用パスワードが一致しません"); return; }
+  setAdminPass(p1);
+  if(a) a.value=""; if(b) b.value="";
+  toast("パスワードを変更しました");
+}
+
+// ===== 職員名簿 Excel/CSV 入出力 =====
+function triggerStaffImport(){
+  if(!isAdminMode()){ openAdminLogin(); return; }
+  const el = document.getElementById("staffImportFile");
+  if(!el) return;
+  el.value = "";
+  el.onchange = ()=>{ handleStaffImport(el.files && el.files[0]); };
+  el.click();
+}
+
+function downloadStaffExcel(){
+  if(!isAdminMode()){ openAdminLogin(); return; }
+
+  const rows = [
+    ["No","氏名","職名"],
+    ...staff.map((s,idx)=>[String(s.no==null?(idx+1):s.no), String(s.name||""), String(s.role||"")])
+  ];
+  const {y,m} = getViewYM();
+  const base = `staff_${y}-${pad2(m)}`;
+
+  // 互換性優先：CSV（Excelでそのまま開けます / 日本語対策でBOM付）
+  const esc = (v)=>{
+    const s = String(v ?? "");
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+  };
+  const csv = "\ufeff" + rows.map(r=>r.map(esc).join(",")).join("\r\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+  downloadBlob(blob, `${base}.csv`);
+}
+
+function handleStaffImport(file){
+  if(!file) return;
+  const name = (file.name||"").toLowerCase();
+  const reader = new FileReader();
+
+  reader.onload = ()=>{
+    try{
+      let rows = [];
+      if(name.endsWith(".xlsx")){
+        if(typeof XLSX === "undefined" || !XLSX || !XLSX.read){
+          toast("この環境では .xlsx の読み込みができません（CSV または .xls をご利用ください）");
+          return;
+        }
+        const buf = reader.result;
+        const wb = XLSX.read(buf, {type:"array"});
+        const first = wb.SheetNames[0];
+        const ws = wb.Sheets[first];
+        rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false});
+      }else{
+        const text = String(reader.result||"");
+        if(name.endsWith(".csv")){
+          rows = parseCsv(text);
+        }else{
+          // .xls/.xml (SpreadsheetML)
+          rows = parseExcelXml(text);
+        }
+      }
+
+      if(!rows || rows.length<2){ toast("読み込みデータが見つかりません"); return; }
+
+      // header skip
+      const body = rows.slice(1).filter(r=>Array.isArray(r) && r.some(v=>String(v||"").trim()!==""));
+      const next = body.map((r,i)=>{
+        const no = String(r[0]||"").trim();
+        const nm = String(r[1]||"").trim();
+        const rl = String(r[2]||"").trim();
+        return { no: no? Number(no): (i+1), name: nm, role: rl };
+      }).filter(s=>s.name);
+
+      if(next.length===0){ toast("氏名が入っている行がありません"); return; }
+
+      staff = next;
+      saveAll();
+      fillStaffSelects();
+      renderStaffTable();
+      renderOverview(); renderIndividual(); // 名簿が変わると一覧も更新
+      toast(`職員名簿を取り込みました（${next.length}名）`);
+    }catch(e){
+      console.error(e);
+      toast("取り込みに失敗しました（CSV / .xls / .xlsx をご利用ください）");
+    }
+  };
+
+  // read
+  if(name.endsWith(".xlsx")) reader.readAsArrayBuffer(file);
+  else reader.readAsText(file, "utf-8");
+}
+
+
+function buildExcelXml(sheetName, rows){
+  const esc = (s)=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const rowXml = rows.map(r=>{
+    const cells = r.map(v=>`<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`).join("");
+    return `<Row>${cells}</Row>`;
+  }).join("");
+  return `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Worksheet ss:Name="${esc(sheetName)}">
+  <Table>${rowXml}</Table>
+ </Worksheet>
+</Workbook>`;
+}
+
+function parseExcelXml(xmlText){
+  const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+  const rows = Array.from(doc.getElementsByTagName("Row"));
+  return rows.map(row=>{
+    const cells = Array.from(row.getElementsByTagName("Cell"));
+    return cells.map(c=>{
+      const data = c.getElementsByTagName("Data")[0];
+      return data ? (data.textContent||"") : "";
+    });
+  });
+}
+
+function parseCsv(csv){
+  const lines = csv.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n").filter(x=>x.trim()!=="");
+  const rows = lines.map(line=>{
+    // simple CSV (comma). quoted supported minimally
+    const out=[]; let cur=""; let inq=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"'){
+        if(inq && line[i+1]==='"'){ cur+='"'; i++; }
+        else inq=!inq;
+      }else if(ch===',' && !inq){
+        out.push(cur); cur="";
+      }else cur+=ch;
+    }
+    out.push(cur);
+    return out;
+  });
+  return rows;
+}
+
+function downloadBlob(blob, filename){
+  try{
+    // old Edge / IE
+    if(window.navigator && window.navigator.msSaveOrOpenBlob){
+      window.navigator.msSaveOrOpenBlob(blob, filename);
+      return;
+    }
+  }catch(e){ /* ignore */ }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.style.display = "none";
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 400);
+}
+
+// ===== 点検（当月チェック） =====
+function runMonthlyAudit(){
+  const {y,m} = getViewYM();
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const issues = [];
+  for(const s of staff){
+    for(let d=1; d<=daysInMonth; d++){
+      const dk = dateKeyFromParts(y,m,d);
+      const off = isOffday(dk);
+      const e = getEntry(dk, s.id);
+      const inV = (e.in||"").trim();
+      const outV = (e.out||"").trim();
+      const othV = (e.otherOff||"").trim();
+
+      // 週休日は原則入力不要（入力があればOK）。勤務日は未入力を拾う
+      if(!off){
+        if(!inV && !outV){
+          // まるごと未入力
+          issues.push({type:"未入力", staff:s, date:dk, detail:"出勤・退勤が未入力"});
+        }else if((inV && !outV) || (!inV && outV)){
+          issues.push({type:"片方のみ", staff:s, date:dk, detail:"出勤/退勤のどちらかが未入力"});
+        }
+      }
+
+      // 逆転
+      const inMin = parseTimeToMin(inV);
+      const outMin = parseTimeToMin(outV);
+      if(inMin!=null && outMin!=null && inMin>outMin){
+        issues.push({type:"逆転", staff:s, date:dk, detail:"出勤＞退勤"});
+      }
+
+      // 業務外形式
+      if(othV){
+        const mm = parseDurationToMin(toHalfWidth(othV));
+        if(mm==null){
+          issues.push({type:"業務外形式", staff:s, date:dk, detail:`業務外が不正（${escapeHtml(othV)}）`});
+        }
+      }
+    }
+  }
+
+  const body = issues.length ? `
+    <div class="small text-slate-600 mb-2">当月（${y}/${pad2(m)}）のチェック結果：<b>${issues.length}件</b></div>
+    <div class="max-h-[60vh] overflow-auto border border-slate-200 rounded-xl">
+      <table class="w-full text-sm">
+        <thead class="sticky top-0 bg-white border-b border-slate-200">
+          <tr>
+            <th class="p-2 text-left">種別</th>
+            <th class="p-2 text-left">日付</th>
+            <th class="p-2 text-left">氏名</th>
+            <th class="p-2 text-left">内容</th>
+            <th class="p-2"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          ${issues.map(it=>`
+            <tr>
+              <td class="p-2">${escapeHtml(it.type)}</td>
+              <td class="p-2 mono">${escapeHtml(it.date)}</td>
+              <td class="p-2">${escapeHtml(it.staff.name||"")}</td>
+              <td class="p-2">${it.detail}</td>
+              <td class="p-2 text-right">
+                <button class="btn btn-ghost px-3 py-1" type="button" onclick="jumpToEdit('${it.staff.id}','${it.date}')">開く</button>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  ` : `
+    <div class="small text-slate-600">当月（${y}/${pad2(m)}）は問題が見つかりませんでした。</div>
+  `;
+
+  openModal("当月点検", "未入力・逆転・業務外形式の確認", body, [
+    {label:"閉じる", className:"btn btn-primary", onClick: closeModal}
+  ]);
+}
+function jumpToEdit(staffId, dateKey){
+  closeModal();
+  // 月が違う場合はviewYMを合わせる
+  const d = getDateObj(dateKey);
+  setViewYM(d.getFullYear(), d.getMonth()+1);
+  hydrateSettingsUI();
+  // 入力に移動して該当日を開く
+  pickStaff(staffId);
+  document.getElementById("inpDate").value = dateKey;
+  syncInputFromEntry();
+  renderDaily();
+  switchTab("input");
 }
 function parseTimeToMin(hhmm){
   if(!hhmm) return null;
@@ -1600,6 +2063,12 @@ try{
 
   // selectors
   fillStaffSelects();
+  // ブラウザ戻る（popstate）でタブ復元
+  window.addEventListener("popstate", (ev)=>{
+    const tab = (ev.state && ev.state.tab) ? ev.state.tab : ((location.hash||"").replace("#","") || "input");
+    switchTab(tab, {push:false});
+  });
+
 syncInputFromEntry();
   renderDaily();
   renderCalendar();
@@ -1607,6 +2076,15 @@ syncInputFromEntry();
   renderIndividual();
   initCharts();
   updateCharts();
+  // 初期タブ（hash優先）
+  const initTab = ((location.hash||"").replace("#","") || "input");
+  switchTab(initTab, {push:false});
+  applyModeVisibility();
+  try{
+    const u = new URL(location.href);
+    u.search = location.search;
+    history.replaceState({tab: currentTab}, "", u);
+  }catch(e){}
 });
 
 /* =========================
@@ -1668,16 +2146,172 @@ function startDateRolloverWatcher(){
 /* =========================
    Tab
    ========================= */
-function switchTab(tab){
-  const tabs = ["input","calendar","overview","individual","settings"];
-  for(const t of tabs){
-    document.getElementById(`section-${t}`).classList.toggle("hidden", t!==tab);
-    document.getElementById(`tab-${t}`).classList.toggle("active", t===tab);
+
+// ===== 管理者ログインモード & 戻る耐性 =====
+const KEY_ADMIN_PASS = "wh.admin.pass.v1";
+const KEY_ADMIN_SESSION = "wh.admin.session.v1";
+
+function getAdminPass(){ return localStorage.getItem(KEY_ADMIN_PASS) || "admin"; }
+function setAdminPass(p){ localStorage.setItem(KEY_ADMIN_PASS, String(p||"")); }
+
+function isAdminMode(){ return sessionStorage.getItem(KEY_ADMIN_SESSION) === "1"; }
+function setAdminSession(on){
+  if(on) sessionStorage.setItem(KEY_ADMIN_SESSION, "1");
+  else sessionStorage.removeItem(KEY_ADMIN_SESSION);
+}
+
+function openAdminLogin(){
+  // モーダル本体（openModalは title/sub/bodyHtml 形式）
+  const body = `
+    <label class="block text-sm font-bold mb-1">パスワード</label>
+    <input id="adminPassInput" type="password" class="input w-full" placeholder="パスワード" autocomplete="current-password" />
+  `;
+  openModal(
+    "管理者ログイン",
+    "管理者のみ「設定・出力」「点検」「復元」などが操作できます。",
+    body,
+    [
+      {label:"ログイン", className:"btn btn-primary", onClick: ()=> tryAdminLogin() },
+      {label:"キャンセル", className:"btn btn-ghost", onClick: ()=> closeModal() },
+    ]
+  );
+  setTimeout(()=>{ const el=document.getElementById("adminPassInput"); if(el) el.focus(); }, 30);
+}
+
+function tryAdminLogin(){
+  const el = document.getElementById("adminPassInput");
+  const v = (el && el.value!=null) ? String(el.value) : "";
+  if(v === getAdminPass()){
+    setAdminSession(true);
+    closeModal();
+    applyModeVisibility();
+    toast("管理者モードでログインしました");
+    // すぐ設定に移動（任意）
+    switchTab("settings", {push:true});
+  }else{
+    toast("パスワードが違います");
   }
+}
+
+function adminLogout(){
+  setAdminSession(false);
+  applyModeVisibility();
+  toast("ログアウトしました");
+  switchTab("input", {push:true});
+}
+
+function adminToggle(){
+  if(isAdminMode()) return adminLogout();
+  return openAdminLogin();
+}
+
+let currentTab = "input";
+
+
+function applyModeVisibility(){
+  const admin = isAdminMode();
+
+  const badge = document.getElementById("modeBadge");
+  setHidden(badge, !admin, "inline-flex");
+  const loginBtn = document.getElementById("adminLoginBtn");
+  if(loginBtn){
+    loginBtn.textContent = admin ? "管理者ログアウト" : "管理者ログイン";
+    setHidden(loginBtn, false, "inline-flex");
+  }
+
+  // 管理者専用UIを隠す（通常）
+  const adminDisplay = (el)=>{
+    const tag = (el.tagName||"").toUpperCase();
+    if(el.dataset && el.dataset.adminDisplay) return el.dataset.adminDisplay;
+    if(tag==="BUTTON") return "inline-flex";
+    if(tag==="SECTION") return "block";
+    if(tag==="DIV") return "block";
+    if(tag==="SPAN") return "inline-flex";
+    if(tag==="TR") return "table-row";
+    if(tag==="TH" || tag==="TD") return "table-cell";
+    return "block";
+  };
+  document.querySelectorAll("[data-admin-only='1']").forEach(el=>{
+    el.style.display = admin ? adminDisplay(el) : "none";
+  });
+
+  // 通常でsettingsにいたら戻す
+  if(!admin && currentTab==="settings"){
+    currentTab = "input";
+    // pushはしない（履歴が荒れない）
+    switchTab("input", {push:false});
+  }
+}
+
+function goBackInApp(){
+  try{
+    if(history.length > 1) history.back();
+    else switchTab("input", {push:false});
+  }catch(e){
+    switchTab("input", {push:false});
+  }
+}
+
+
+/* ===== Display helpers (Tailwindが読み込めない環境でも動作するように) ===== */
+function rememberDisplay(el){
+  if(!el) return;
+  if(el.dataset && el.dataset._disp) return;
+  try{
+    const d = getComputedStyle(el).display;
+    el.dataset._disp = (d && d!=="none") ? d : "";
+  }catch(e){
+    el.dataset._disp = "";
+  }
+}
+function setHidden(el, hidden, fallbackDisplay){
+  if(!el) return;
+  rememberDisplay(el);
+  if(hidden){
+    el.style.display = "none";
+    el.classList.add("hidden");
+  }else{
+    const d = (fallbackDisplay!=null && fallbackDisplay!=="") ? fallbackDisplay : (el.dataset._disp || "");
+    el.style.display = d || "";
+    el.classList.remove("hidden");
+  }
+}
+
+function switchTab(tab, opts){
+  const ADMIN_MODE = isAdminMode();
+  opts = opts || {};
+  const push = (opts.push !== false);
+
+  if(!ADMIN_MODE && tab==="settings") tab = "input";
+
+  const tabs = ["input","calendar","overview","individual","settings"];
+  currentTab = tab;
+
+  for(const t of tabs){
+    const sec = document.getElementById(`section-${t}`);
+    const btn = document.getElementById(`tab-${t}`);
+    if(sec) setHidden(sec, t!==tab);
+    if(btn) btn.classList.toggle("active", t===tab);
+  }
+
   if(tab==="calendar") renderCalendar();
   if(tab==="overview"){ renderOverview(); updateCharts(); }
   if(tab==="individual") renderIndividual();
   if(tab==="settings"){ hydrateSettingsUI(); renderStaffTable(); }
+
+  applyModeVisibility();
+
+  if(push){
+    try{
+      const u = new URL(location.href);
+      // file:// では pushState のURL整形で search が落ちる環境があるため、明示的に保持
+      u.search = location.search;
+      u.hash = tab;
+      history.pushState({tab}, "", u);
+    }catch(e){
+      location.hash = tab;
+    }
+  }
 }
 
 /* =========================
@@ -1744,44 +2378,167 @@ function renderAll(){
    Input tab behavior
    ========================= */
 // --- Input: staff "self" & fast picker ---
+let _inpAutoSelect = true; // 自動選択を許可するか（誤操作防止のため、スタンプ後はOFFにする）
 function getInpStaffId(){
   const hid = document.getElementById("inpStaffId");
-  let v = hid?.value || "";
-  if(!v && staff[0]?.id){
-    v = staff[0].id;
-    if(hid) hid.value = v;
+  let v = (hid?.value || "").trim();
+  if(v) return v;
+
+  // 自動選択を止めている間は「未選択」を維持
+  if(!_inpAutoSelect) return "";
+
+  // 最後に選んだ職員（この端末）
+  const stored = (localStorage.getItem(STORE.selfStaff) || "").trim();
+  if(stored && staff.some(s=>s.id===stored)){
+    if(hid) hid.value = stored;
+    const s = staff.find(x=>x.id===stored);
     const nameEl = document.getElementById("inpStaffName");
-    const s = staff.find(x=>x.id===v);
     if(nameEl) nameEl.textContent = s ? `${s.no}. ${s.name}` : "—";
+    return stored;
   }
-  return v;
+
+  return "";
 }
 function setInputStaff(staffId){
+  cancelAutoClearStaff();
+  _inpAutoSelect = true; // 選んだら自動選択を再開（ただし「未選択」を維持したい場合は clear でOFFにする）
+
   const hid = document.getElementById("inpStaffId");
   if(!hid) return;
-  if(!staffId) staffId = staff[0]?.id || "";
-  hid.value = staffId;
+
+  const sid = (staffId || "").trim();
+  const nameEl = document.getElementById("inpStaffName");
+
+  // 空指定なら「未選択」にする
+  if(!sid){
+    hid.value = "";
+    if(nameEl) nameEl.textContent = "職員名を選択";
+    // 入力欄もクリア
+    ["inpIn","inpOut","inpOtherOff","inpOverMan"].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.value = "";
+    });
+    updateInpStaffBtnState();
+    safeCall(renderInputCalc);
+    return;
+  }
+
+  hid.value = sid;
 
   // remember last used staff on this device
-  localStorage.setItem(STORE.selfStaff, staffId);
+  localStorage.setItem(STORE.selfStaff, sid);
 
-  const s = staff.find(x=>x.id===staffId);
-  const nameEl = document.getElementById("inpStaffName");
+  const s = staff.find(x=>x.id===sid);
   if(nameEl) nameEl.textContent = s ? `${s.no}. ${s.name}` : "—";
 
   syncInputFromEntry();
 }
 
 
+
+let _autoClearStaffTimer = null;
+let _autoClearStaffDeadline = 0;
+let _autoClearStaffIntervalStarted = false;
+
+function cancelAutoClearStaff(){
+  if(_autoClearStaffTimer){
+    clearTimeout(_autoClearStaffTimer);
+    _autoClearStaffTimer = null;
+  }
+  _autoClearStaffDeadline = 0;
+}
+
+function scheduleAutoClearStaff(ms){
+  // 10秒後に「未選択」を強制（setTimeoutが途切れても動くようにdeadline監視も併用）
+  const wait = Number(ms || 10000);
+  cancelAutoClearStaff();
+  _autoClearStaffDeadline = Date.now() + wait;
+
+  const kick = ()=>{
+    if(!_autoClearStaffDeadline) return;
+    const rest = _autoClearStaffDeadline - Date.now();
+    if(rest > 5){
+      _autoClearStaffTimer = setTimeout(kick, Math.min(rest, 1000));
+      return;
+    }
+    _autoClearStaffDeadline = 0;
+    clearInputStaffSelection(true);
+  };
+  _autoClearStaffTimer = setTimeout(kick, wait);
+
+  if(!_autoClearStaffIntervalStarted){
+    _autoClearStaffIntervalStarted = true;
+    setInterval(()=>{
+      if(_autoClearStaffDeadline && Date.now() >= _autoClearStaffDeadline){
+        _autoClearStaffDeadline = 0;
+        clearInputStaffSelection(true);
+      }
+    }, 500);
+  }
+}
+
+function clearInputStaffSelection(showToast){
+  _inpAutoSelect = false; // スタンプ後は自動選択を止め、「未選択」を維持
+  const hid = document.getElementById("inpStaffId");
+  if(hid) hid.value = "";
+  const nameEl = document.getElementById("inpStaffName");
+  if(nameEl) nameEl.textContent = "職員名を選択";
+
+  // 入力欄も一旦クリア（次の職員に持ち越さない）
+  ["inpIn","inpOut","inpOtherOff","inpOverMan"].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = "";
+  });
+
+  updateInpStaffBtnState();
+
+  // 画面表示も未選択に寄せる
+  const rowName = document.getElementById("rowName");
+  const rowIn = document.getElementById("rowIn");
+  const rowOut = document.getElementById("rowOut");
+  const rowStayEq = document.getElementById("rowStayEq");
+  const rowOther = document.getElementById("rowOther");
+  const rowOver = document.getElementById("rowOver");
+  const rowMonthOver = document.getElementById("rowMonthOver");
+  if(rowName) rowName.textContent = "—";
+  if(rowIn) rowIn.textContent = "--:--";
+  if(rowOut) rowOut.textContent = "--:--";
+  if(rowStayEq) rowStayEq.textContent = "--:--";
+  if(rowOther) rowOther.textContent = "0時間0分";
+  if(rowOver) rowOver.textContent = "--:--";
+  if(rowMonthOver) rowMonthOver.textContent = "--:--";
+
+  // 残りカード
+  ["remToGoal","remTo80"].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.textContent="--:--";
+  });
+  ["remBarGoal","remBar80"].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.style.width="0%";
+  });
+  const cap1H = Math.floor(Number(settings.remCap1H ?? settings.goalOverH ?? 45));
+  const cap2H = Math.floor(Number(settings.remCap2H ?? 80));
+  const elCap1 = document.getElementById("remCap1HLabel"); if(elCap1) elCap1.textContent = String(cap1H);
+  const elCap2 = document.getElementById("remCap2HLabel"); if(elCap2) elCap2.textContent = String(cap2H);
+  const elUsedGoal = document.getElementById("usedGoal"); if(elUsedGoal) elUsedGoal.textContent="--:--";
+  const elUsed80 = document.getElementById("used80"); if(elUsed80) elUsed80.textContent="--:--";
+  const elCapGoal = document.getElementById("capGoal"); if(elCapGoal) elCapGoal.textContent = formatDurJP(Math.max(0,cap1H)*60);
+  const elCap80 = document.getElementById("cap80"); if(elCap80) elCap80.textContent = formatDurJP(Math.max(0,cap2H)*60);
+
+
+  if(typeof renderDaily==='function') renderDaily();
+
+  if(showToast) toast("職員選択を解除しました");
+}
+
 function openStaffPicker(){
   const body = `
     <div class="small">検索して選べます（この端末では最後に選んだ職員が自動で保持されます）。</div>
-    <input id="staffPickQ" class="input mt-3" placeholder="氏名で検索（例：佐藤）" oninput="renderStaffPicker()" />
-    <div id="staffPickList" class="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2"></div>
+    <input id="staffPickQ" class="input mt-3" placeholder="氏名または番号で検索（例：佐藤 / 12）" oninput="renderStaffPicker()" />
+    <div id="staffPickList" class="mt-3 staffPickGrid"></div>
   `;
   openModal("職員を選択", "入力する職員を選びます", body, [
     { label:"閉じる", className:"btn btn-ghost", onClick: closeModal },
-  ], { hideHeaderClose:true });
+  ], { hideHeaderClose:true, maxWidthPx: 1280 });
   setTimeout(()=>renderStaffPicker(), 0);
 }
 
@@ -1804,7 +2561,7 @@ function renderStaffPicker(){
     const disp = getDisplayNameRole(s);
     return `
       <button type="button" class="btn btn-ghost staffPickBtn ${stateClass} ${active?"active":""} w-full text-left" onclick="pickStaff('${s.id}')">
-        <div class="font-black truncate">${escapeHtml(disp.name)}</div>
+        <div class="font-black staffPickName">${escapeHtml(disp.name)}</div>
         <div class="small mono">No.${escapeHtml(String(s.no??""))} / ${escapeHtml(disp.role||"")}</div>
       </button>
     `;
@@ -1818,9 +2575,22 @@ function pickStaff(staffId){
 
 // --- Fast actions ---
 function quickStamp(type){
+  // 退勤だけ押すミスを防ぐ
+  if(type==="out"){
+    const inV = (document.getElementById("inpIn")?.value||"").trim();
+    if(!inV){
+      toast("出勤していないのに退勤を押しています。先に出勤時刻を入力してください。");
+      return;
+    }
+  }
   if(type==="in") fillNow("in");
   if(type==="out") fillNow("out");
-  saveEntry();
+
+  const ok = saveEntry();
+  if(ok){
+    // 10秒だけ表示して、その後「職員名を選択」に戻す（押し間違い防止）
+    scheduleAutoClearStaff(10000);
+  }
 }
 
 function nudgeTime(field, deltaMin){
@@ -1889,9 +2659,26 @@ function clearField(which){
 }
 
 function syncInputFromEntry(){
-  const staffId = getInpStaffId() || (staff[0]?.id);
+  const staffId = getInpStaffId();
   const dateKey = document.getElementById("inpDate").value;
-  if(!staffId || !dateKey) return;
+
+  // 日付バッジは「職員未選択」でも表示してよい
+  if(dateKey){
+    const off = isOffday(dateKey);
+    const dobj = getDateObj(dateKey);
+    const badge = off
+      ? `<span class="chip"><span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>週休日</span> <span class="small">${dobj.toLocaleDateString("ja-JP",{weekday:"short"})}</span>`
+      : `<span class="chip"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>勤務日</span> <span class="small">${dobj.toLocaleDateString("ja-JP",{weekday:"short"})}</span>`;
+    const bb = document.getElementById("inpDayBadge");
+    if(bb) bb.innerHTML = badge;
+  }
+
+  // 職員未選択のときは、入力欄を自動で埋めない（誤操作防止）
+  if(!staffId || !dateKey){
+    safeCall(renderInputCalc);
+    updateInpStaffBtnState();
+    return;
+  }
 
   const e = getEntry(dateKey, staffId);
 
@@ -1901,13 +2688,6 @@ function syncInputFromEntry(){
 
   const otherEl = document.getElementById("inpOtherOff");
   if(otherEl) otherEl.value = e.otherOff || "";
-
-  const off = isOffday(dateKey);
-  const dobj = getDateObj(dateKey);
-  const badge = off
-    ? `<span class="chip"><span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>週休日</span> <span class="small">${dobj.toLocaleDateString("ja-JP",{weekday:"short"})}</span>`
-    : `<span class="chip"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>勤務日</span> <span class="small">${dobj.toLocaleDateString("ja-JP",{weekday:"short"})}</span>`;
-  document.getElementById("inpDayBadge").innerHTML = badge;
 
   renderInputCalc();
   updateInpStaffBtnState();
@@ -1929,7 +2709,42 @@ function updateInpStaffBtnState(){
 function renderInputCalc(){
   const dateKey = document.getElementById("inpDate").value;
   const staffId = getInpStaffId();
-  if(!dateKey || !staffId) return;
+  // 「残り（当月合計）」の基準は、職員未選択でも表示する
+  const cap1H = Math.floor(Number(settings.remCap1H ?? settings.goalOverH ?? 45));
+  const cap2H = Math.floor(Number(settings.remCap2H ?? 80));
+  const cap1Min = Math.max(0, cap1H) * 60;
+  const cap2Min = Math.max(0, cap2H) * 60;
+
+  const cap1Label = document.getElementById("remCap1HLabel");
+  const cap2Label = document.getElementById("remCap2HLabel");
+  if(cap1Label) cap1Label.textContent = String(cap1H);
+  if(cap2Label) cap2Label.textContent = String(cap2H);
+
+  const capGoal = document.getElementById("capGoal");
+  const cap80 = document.getElementById("cap80");
+  if(capGoal) capGoal.textContent = (cap1Min>0 ? formatDurJP(cap1Min) : "--:--");
+  if(cap80) cap80.textContent = (cap2Min>0 ? formatDurJP(cap2Min) : "--:--");
+
+  // 休憩表示（説明カード用）
+  const br2 = document.getElementById("miniBreak");
+  if(br2) br2.textContent = formatDurJP(Number(settings.breakMin ?? settings.breakWorkMin ?? 45));
+
+  if(!dateKey || !staffId){
+    const elG0 = document.getElementById("remToGoal");
+    const el80_0 = document.getElementById("remTo80");
+    const usedGoal0 = document.getElementById("usedGoal");
+    const used80_0 = document.getElementById("used80");
+    const barG0 = document.getElementById("remBarGoal");
+    const bar80_0 = document.getElementById("remBar80");
+    if(elG0) elG0.textContent = "--:--";
+    if(el80_0) el80_0.textContent = "--:--";
+    if(usedGoal0) usedGoal0.textContent = "--:--";
+    if(used80_0) used80_0.textContent = "--:--";
+    if(barG0) barG0.style.width = "0%";
+    if(bar80_0) bar80_0.style.width = "0%";
+    updateInpStaffBtnState();
+    return;
+  }
 
   const s = staff.find(x=>x.id===staffId);
   const e = getEntry(dateKey, staffId);
@@ -1976,7 +2791,47 @@ function renderInputCalc(){
     const mm = dObj.getMonth() + 1;
     const sumObj = summaryByStaff(staffId, yy, mm);
     rowMonthOver.textContent = formatDurJP(sumObj.totalOver || 0);
-  }
+    // 残り時間（目標・80h）
+    try{
+      const total = (sumObj.totalOver || 0);
+      const remGoal = Math.max(0, cap1Min - total);
+      const rem80 = Math.max(0, cap2Min - total);
+
+      const elG = document.getElementById("remToGoal");
+      const el80 = document.getElementById("remTo80");
+      const barG = document.getElementById("remBarGoal");
+      const bar80 = document.getElementById("remBar80");
+      const usedGoal = document.getElementById("usedGoal");
+      const capGoal = document.getElementById("capGoal");
+      const used80 = document.getElementById("used80");
+      const cap80 = document.getElementById("cap80");
+
+      if(capGoal) capGoal.textContent = (cap1Min>0 ? formatDurJP(cap1Min) : "--:--");
+      if(cap80) cap80.textContent = (cap2Min>0 ? formatDurJP(cap2Min) : "--:--");
+      if(usedGoal) usedGoal.textContent = formatDurJP(total);
+      if(used80) used80.textContent = formatDurJP(total);
+
+      if(elG){
+        if(cap1Min>0 && total > cap1Min) elG.textContent = `+${formatDurJP(total-cap1Min)} 超過`;
+        else elG.textContent = (cap1Min>0 ? formatDurJP(remGoal) : "--:--");
+      }
+      if(el80){
+        if(cap2Min>0 && total > cap2Min) el80.textContent = `+${formatDurJP(total-cap2Min)} 超過`;
+        else el80.textContent = (cap2Min>0 ? formatDurJP(rem80) : "--:--");
+      }
+
+      if(barG){
+        const pctG = cap1Min>0 ? Math.min(100, (total/cap1Min*100)) : 0;
+        barG.style.width = pctG.toFixed(0) + "%";
+        barG.style.background = (cap2Min>0 && total >= cap2Min) ? "rgba(239,68,68,.75)" : (cap1Min>0 && total >= cap1Min) ? "rgba(245,158,11,.75)" : "var(--brand)";
+      }
+      if(bar80){
+        const pct80 = cap2Min>0 ? Math.min(100, (total/cap2Min*100)) : 0;
+        bar80.style.width = pct80.toFixed(0) + "%";
+        bar80.style.background = (cap2Min>0 && total >= cap2Min) ? "rgba(239,68,68,.85)" : "rgba(239,68,68,.55)";
+      }
+}catch(e){} 
+}
 
   // mini
   const br = document.getElementById("miniBreak");
@@ -2026,23 +2881,36 @@ function saveOtherOff(){
 function saveEntry(){
   const staffId = getInpStaffId();
   const dateKey = document.getElementById("inpDate")?.value;
-  if(!staffId){ toast("職員を選択してください"); return; }
-  if(!dateKey){ toast("日付を選択してください"); return; }
+  if(!staffId){ toast("職員を選択してください"); return false; }
+  if(!dateKey){ toast("日付を選択してください"); return false; }
 
   const e = getEntry(dateKey, staffId);
-  e.in = document.getElementById("inpIn")?.value || "";
-  e.out = document.getElementById("inpOut")?.value || "";
-  e.otherOff = document.getElementById("inpOtherOff")?.value || e.otherOff || "";
+  e.in = (document.getElementById("inpIn")?.value || "").trim();
+  e.out = (document.getElementById("inpOut")?.value || "").trim();
+
+  // 業務外：全角→半角に整形
+  const othEl = document.getElementById("inpOtherOff");
+  if(othEl) normalizeHalfInput(othEl);
+  e.otherOff = (othEl?.value || e.otherOff || "").trim();
+
+  // 逆転チェック
+  const inMin = parseTimeToMin(e.in);
+  const outMin = parseTimeToMin(e.out);
+  if(inMin!=null && outMin!=null && inMin > outMin){
+    toast("出勤と退勤が逆転しています。入力を確認してください。");
+    return false;
+  }
 
   save(STORE.records, records);
+  autoBackup();
   toast("保存しました");
   syncInputFromEntry();
-  renderDaily();
-  renderOverview();
-  renderIndividual();
-  updateCharts();
+  safeCall(renderDaily);
+  safeCall(renderOverview);
+  safeCall(renderIndividual);
+  safeCall(updateCharts);
+  return true;
 }
-
 function jumpToIndividual(){
   // set individual staff select to current staff
   const staffId = getInpStaffId();
@@ -2788,6 +3656,10 @@ function hydrateSettingsUI(){
   
   const g = document.getElementById("setGoalOverH");
   if(g) g.value = Number(settings.goalOverH ?? 45);
+  const r1 = document.getElementById("setRemCap1H");
+  if(r1) r1.value = Number(settings.remCap1H ?? settings.goalOverH ?? 45);
+  const r2 = document.getElementById("setRemCap2H");
+  if(r2) r2.value = Number(settings.remCap2H ?? 80);
 renderStaffTable();
   fillStaffSelects();
   fillReasonEditor();
@@ -2819,6 +3691,18 @@ function applyGoalRankSettings(){
   const g = Number(document.getElementById("setGoalOverH")?.value);
   if(!(g>=0 && g<=9999)){ toast("目標（時間）が不正です"); return; }
   settings.goalOverH = Math.floor(g);
+
+  // 入力タブ「残り（当月合計）」の基準（時間）
+  const r1s = document.getElementById("setRemCap1H")?.value;
+  const r2s = document.getElementById("setRemCap2H")?.value;
+  const r1 = (r1s==="" || r1s==null) ? g : Number(r1s);
+  const r2 = (r2s==="" || r2s==null) ? 80 : Number(r2s);
+  if(!(r1>=0 && r1<=9999) || !(r2>=0 && r2<=9999)){
+    toast("残り表示（時間）が不正です");
+    return;
+  }
+  settings.remCap1H = Math.floor(r1);
+  settings.remCap2H = Math.floor(r2);
 
   const n = (id)=>{
     const el = document.getElementById(id);
@@ -2861,10 +3745,13 @@ function applyGoalRankSettings(){
   toast("保存しました");
   renderOverview();
   renderIndividual();
+  safeCall(renderInputCalc);
 }
 
 function resetGoalRankSettings(){
   settings.goalOverH = Number(DEFAULT_SETTINGS.goalOverH ?? 45);
+  settings.remCap1H = Number(DEFAULT_SETTINGS.remCap1H ?? settings.goalOverH ?? 45);
+  settings.remCap2H = Number(DEFAULT_SETTINGS.remCap2H ?? 80);
   settings.goalRankCfg = (DEFAULT_SETTINGS.goalRankCfg||[]).map(o=>({rank:o.rank, min:o.min, max:o.max, word:o.word}));
   save(STORE.settings, settings);
   hydrateSettingsUI();
@@ -3004,20 +3891,81 @@ function sortStaff(){
   renderOverview();
 }
 
+function renumberStaff(){
+  staff.forEach((s,i)=>{ s.no = i+1; });
+}
+
 function renderStaffTable(){
   const tbody = document.getElementById("staffBody");
   if(!tbody) return;
+  // 常にNoを並び順に合わせる
+  renumberStaff();
+
   tbody.innerHTML = staff.map((s,idx)=>`
-    <tr>
-      <td class="p-3 text-sm mono">${s.no==null? (idx+1) : s.no}</td>
-      <td class="p-3 text-sm font-bold">${escapeHtml(s.name||"")}</td>
-      <td class="p-3 text-sm">${escapeHtml(s.role||"")}</td>
-      <td class="p-3 text-sm no-print whitespace-nowrap">
-        <button class="btn btn-ghost px-3 py-1" onclick="openStaffEdit('${s.id}')">編集</button>
-        <button class="btn btn-ghost px-3 py-1" onclick="removeStaff('${s.id}')">削除</button>
+    <tr data-idx="${idx}" class="staff-row">
+      <td class="p-3 text-sm mono text-center">${s.no}</td>
+      <td class="p-3 text-sm font-bold text-center">${escapeHtml(s.name||"")}</td>
+      <td class="p-3 text-sm text-center">${escapeHtml(s.role||"")}</td>
+      <td class="p-3 text-sm no-print whitespace-nowrap text-center">
+        <button class="btn btn-ghost px-3 py-1" onclick="openStaffEdit('${s.id}')" type="button">編集</button>
+        <button class="btn btn-ghost px-3 py-1" onclick="removeStaff('${s.id}')" type="button">削除</button>
+      </td>
+      <td class="p-3 text-sm no-print text-center">
+        <span class="dragHandle" title="ドラッグして並び替え" aria-label="ドラッグして並び替え">≡</span>
       </td>
     </tr>
   `).join("");
+
+  setupStaffDrag();
+}
+
+let __staffDragFrom = null;
+
+function setupStaffDrag(){
+  const tbody = document.getElementById("staffBody");
+  if(!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll("tr.staff-row"));
+  rows.forEach(row=>{
+    row.setAttribute("draggable","true");
+
+    row.addEventListener("dragstart", (e)=>{
+      __staffDragFrom = Number(row.dataset.idx);
+      row.classList.add("is-dragging");
+      try{ e.dataTransfer.setData("text/plain", String(__staffDragFrom)); }catch(_){}
+      e.dataTransfer.effectAllowed = "move";
+    });
+
+    row.addEventListener("dragend", ()=>{
+      row.classList.remove("is-dragging");
+      __staffDragFrom = null;
+      rows.forEach(r=>r.classList.remove("is-drop-target"));
+    });
+
+    row.addEventListener("dragover", (e)=>{
+      e.preventDefault();
+      row.classList.add("is-drop-target");
+      e.dataTransfer.dropEffect = "move";
+    });
+
+    row.addEventListener("dragleave", ()=>{
+      row.classList.remove("is-drop-target");
+    });
+
+    row.addEventListener("drop", (e)=>{
+      e.preventDefault();
+      const from = (__staffDragFrom!=null) ? __staffDragFrom : Number((e.dataTransfer && e.dataTransfer.getData("text/plain"))||-1);
+      const to = Number(row.dataset.idx);
+      if(!(from>=0) || !(to>=0) || from===to) return;
+
+      const item = staff.splice(from,1)[0];
+      staff.splice(to,0,item);
+
+      renumberStaff();
+      saveAll();
+      renderStaffTable();
+      toast("並び順を更新しました");
+    });
+  });
 }
 
 /* =========================
@@ -4598,6 +5546,13 @@ function openModal(title, sub, bodyHtml, actions, opts){
     headClose.style.display = (opts && opts.hideHeaderClose) ? "none" : "";
   }
 
+  // モーダル幅（必要な場面だけ広げる）
+  const card = document.getElementById("modalCard");
+  if(card){
+    if(opts && opts.maxWidthPx){ card.style.maxWidth = String(opts.maxWidthPx) + "px"; }
+    else{ card.style.maxWidth = ""; }
+  }
+
   const wrap = document.getElementById("modalWrap");
   wrap.style.display = "flex";
   wrap.classList.remove("hidden");
@@ -4611,6 +5566,8 @@ function closeModal(){
   wrap.style.display = "none";
   const body = document.getElementById("modalBody");
   if(body) body.innerHTML = "";
+  const card = document.getElementById("modalCard");
+  if(card) card.style.maxWidth = "";
 }
 
 
@@ -4665,7 +5622,6 @@ function openHelp(){
         <div class="card p-4">
           <div class="font-black">① 入力</div>
           <div class="small text-slate-600 mt-1">職員と日付を選び、<b>出勤</b>・<b>退勤</b>（必要な日だけ <b>業務外</b>）を保存。</div>
-          <div class="small text-slate-500 mt-2">時間外は自動計算。必要なら「自」で自動値を入れられます。</div>
         </div>
         <div class="card p-4">
           <div class="font-black">② 週休日の日</div>
