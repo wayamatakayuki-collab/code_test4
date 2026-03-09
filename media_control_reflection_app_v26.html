@@ -1,0 +1,2888 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>メディアコントロール振り返りアプリ</title>
+  <style>
+    :root{
+      --bg1:#fff8ef;
+      --bg2:#eef8ff;
+      --card:#ffffff;
+      --line:#d9e8f5;
+      --text:#334155;
+      --sub:#64748b;
+      --pink:#ff7aa2;
+      --orange:#ffb347;
+      --yellow:#ffd95a;
+      --green:#56d39b;
+      --mint:#8be3d3;
+      --blue:#68a7ff;
+      --purple:#9b8cff;
+      --navy:#4f5d75;
+      --danger:#ef6b6b;
+      --shadow:0 14px 30px rgba(69, 104, 154, .12);
+      --radius:24px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:"Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top left, #fff4cf 0, transparent 24%),
+        radial-gradient(circle at top right, #dff3ff 0, transparent 23%),
+        linear-gradient(180deg,var(--bg1),var(--bg2));
+    }
+    .wrap{max-width:1500px;margin:0 auto;padding:18px 16px 72px}
+    .hero{
+      background:linear-gradient(135deg,#fff 0%,#fff8fd 45%,#eef7ff 100%);
+      border:3px solid #fff;
+      border-radius:32px;
+      box-shadow:var(--shadow);
+      padding:20px;
+      position:relative;
+      overflow:hidden;
+    }
+    .hero:before,.hero:after{
+      content:"";position:absolute;border-radius:50%;opacity:.15;pointer-events:none;
+    }
+    .hero:before{width:180px;height:180px;background:var(--pink);right:-40px;top:-40px}
+    .hero:after{width:130px;height:130px;background:var(--yellow);left:-35px;bottom:-35px}
+    .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;align-items:center}
+    h1{margin:0;font-size:clamp(1.8rem,3vw,2.7rem);line-height:1.2}
+    .lead{margin:.6rem 0 0;color:var(--sub);line-height:1.8;font-weight:700}
+    .badge-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+    .badge{background:#fff;border:2px solid #f6d7e1;border-radius:999px;padding:8px 14px;font-weight:800}
+    .badge:nth-child(2){border-color:#d8edff}
+    .badge:nth-child(3){border-color:#e6f8db}
+    .hero-card{
+      background:rgba(255,255,255,.9);
+      border:2px dashed #dbe9ff;
+      border-radius:24px;
+      padding:16px;
+    }
+    .hero-card p{margin:.35rem 0;line-height:1.8;font-weight:700}
+    .top-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    button,input,select,textarea{font:inherit}
+    button,.btn-like{
+      border:none;border-radius:16px;padding:12px 16px;font-weight:800;cursor:pointer;
+      transition:.15s transform,.15s filter;box-shadow:0 6px 14px rgba(0,0,0,.07);
+    }
+    button:hover,.btn-like:hover{transform:translateY(-1px);filter:brightness(.98)}
+    .primary{background:linear-gradient(135deg,var(--pink),#ff8a65);color:#fff}
+    .secondary{background:linear-gradient(135deg,var(--blue),#7cc6ff);color:#fff}
+    .success{background:linear-gradient(135deg,var(--green),#7ee1be);color:#fff}
+    .warning{background:linear-gradient(135deg,var(--orange),#ffd36b);color:#fff}
+    .ghost{background:#fff;color:var(--text);border:2px solid #e8eef7}
+    .danger{background:linear-gradient(135deg,#ff8f8f,var(--danger));color:#fff}
+    .layout{display:grid;grid-template-columns:440px 1fr;gap:18px;margin-top:18px}
+    .layout.admin-hidden{grid-template-columns:1fr}
+    .layout.admin-hidden .panel{display:none}
+    .layout.admin-open{display:block;margin-top:18px}
+    .layout.admin-open .main-stack{display:none!important}
+    .layout.admin-open .panel{display:block!important;max-width:100%!important;width:100%!important;padding:28px clamp(18px,2.4vw,32px);margin:0 auto}
+    .panel,.card{
+      background:rgba(255,255,255,.96);
+      border:2px solid #fff;
+      border-radius:28px;
+      box-shadow:var(--shadow);
+      padding:18px;
+    }
+    .panel h2,.card h2{margin:0 0 10px;font-size:1.25rem}
+    .sub{color:var(--sub);line-height:1.7;margin:0 0 12px}
+    .field{margin-bottom:12px}
+    .field label{display:block;font-size:.92rem;font-weight:800;margin-bottom:6px;color:var(--navy)}
+    input[type="text"],input[type="number"],input[type="date"],select,textarea{
+      width:100%;border:2px solid #dfe9f5;border-radius:16px;padding:11px 12px;background:#fff;
+    }
+    input[type="text"],input[type="number"],input[type="date"],select{min-height:52px}
+    select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%, #64748b 50%),linear-gradient(135deg,#64748b 50%, transparent 50%);background-position:calc(100% - 22px) calc(50% - 3px),calc(100% - 16px) calc(50% - 3px);background-size:6px 6px,6px 6px;background-repeat:no-repeat;padding-right:36px}
+    textarea{min-height:100px;resize:vertical;line-height:1.7}
+    .tiny{font-size:.86rem;color:var(--sub);line-height:1.6}
+    .section-gap{margin-top:18px}
+    .chip-list{display:flex;flex-wrap:wrap;gap:8px}
+    .chip{background:#f8fbff;border:2px solid #e0edf8;border-radius:999px;padding:7px 11px;font-size:.88rem;font-weight:800}
+    .main-stack{display:grid;gap:18px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .timeline-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+    .category-picker{display:flex;flex-wrap:wrap;gap:8px}
+    .cat-btn{background:#fff;border:2px solid #e1eaf4;color:var(--text);border-radius:999px;padding:8px 12px;font-weight:800}
+    .cat-btn.active{outline:4px solid rgba(104,167,255,.18)}
+    .timeline{
+      background:linear-gradient(180deg,#fcfeff,#f7fbff);
+      border:2px solid #e6eff8;border-radius:24px;padding:14px;overflow:auto;
+    }
+    .hour-labels{display:grid;grid-template-columns:repeat(24,minmax(48px,1fr));gap:2px;min-width:1152px;margin-bottom:8px}
+    .hour-labels div{text-align:center;font-size:.76rem;font-weight:800;color:var(--sub)}
+    .slot-grid{display:grid;grid-template-columns:repeat(48,minmax(22px,1fr));gap:4px;min-width:1152px}
+    .slot{
+      height:64px;border-radius:12px;border:1px solid rgba(15,23,42,.08);
+      display:flex;align-items:flex-end;justify-content:center;padding:4px 2px;
+      font-size:.68rem;font-weight:800;color:#fff;cursor:pointer;user-select:none;text-align:center;line-height:1.08;
+    }
+    .slot.empty{background:#e5e7eb;color:#64748b}
+    .slot.sleep{background:#9b8cff}
+    .slot.school{background:#68a7ff}
+    .slot.homework{background:#ffb347}
+    .slot.free{background:#56d39b}
+    .slot.bath{background:#5cd6ea}
+    .slot.meal{background:#ff8c82}
+    .slot.media{background:#ff7aa2}
+    .slot.nomedia{background:#4f5d75}
+    .slot.other{background:#a6b7cc}
+    .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:12px}
+    .legend-item{display:flex;align-items:center;gap:8px;background:#fff;border:2px solid #edf3fa;border-radius:16px;padding:8px 10px;font-weight:800}
+    .sw{width:18px;height:18px;border-radius:6px;display:inline-block}
+    .summary-boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:12px}
+    .summary-box{background:#fff;border:2px dashed #dbe8f4;border-radius:20px;padding:14px;text-align:center}
+    .summary-box strong{display:block;font-size:1.5rem;margin-top:6px}
+    .media-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+    .media-card{background:#fff;border:2px solid #edf3fa;border-radius:22px;padding:14px;text-align:center}
+    .media-card h3{margin:0 0 8px;font-size:1rem}
+    .media-card .icon{font-size:2rem;margin-bottom:8px}
+    .total-box{background:linear-gradient(135deg,#fff3f7,#fffaf0);border:3px solid #ffd7e3}
+    table{width:100%;border-collapse:collapse;overflow:hidden;border-radius:18px}
+    th,td{border:2px solid #eaf1f8;padding:10px;text-align:center;background:#fff}
+    th{background:#f5faff;font-weight:800}
+    .cycle-btn{min-width:46px;padding:10px 0;border-radius:12px;box-shadow:none}
+    .mark-ok{background:#eafff0;color:#15803d}
+    .mark-ng{background:#fff0f0;color:#b91c1c}
+    .mark-skip{background:#f1f5f9;color:#475569}
+    .mark-empty{background:#fff;color:#94a3b8}
+    .status{
+      padding:10px 12px;border-radius:16px;font-weight:800;display:none;margin-top:10px;
+      background:#eef7ff;border:2px solid #d9ecff;color:#245f9b
+    }
+    .status.show{display:block}
+    .admin-box{background:#fffdf6;border:2px dashed #fde3a7;border-radius:22px;padding:14px}
+    .list-scroll{max-height:240px;overflow:auto;border:2px solid #edf3fa;border-radius:18px;padding:8px;background:#fcfeff}
+    .student-row{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px dashed #e5edf7;font-size:.93rem}
+    .student-row:last-child{border-bottom:none}
+    details{border:2px solid #ecf2f8;border-radius:18px;padding:10px 12px;background:#fff}
+    details summary{cursor:pointer;font-weight:800;color:var(--navy)}
+    .footer-note{margin-top:16px;font-size:.9rem;color:var(--sub);line-height:1.8}
+    .small-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .firebase-box{background:#f7fcff;border:2px dashed #cde7ff;border-radius:20px;padding:12px}
+    .history-card{background:linear-gradient(135deg,#fffef8,#f7fbff);border:2px dashed #d8e7f7;padding-bottom:14px}
+    .history-list{display:grid;gap:10px;margin-top:12px}
+    .history-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:2px solid #edf3fa;border-radius:18px;background:#fff}
+    .admin-entry{display:flex;gap:8px;align-items:center;margin-top:12px}
+    .login-pop{margin-top:12px;background:#fffdf6;border:2px dashed #f7c98b;border-radius:20px;padding:12px;max-width:520px}
+    .login-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end}
+    .editor-group{background:#fff;border:2px solid #edf3fa;border-radius:22px;padding:12px;margin-top:12px}
+    .editor-group h4{margin:0 0 8px;color:var(--navy);font-size:1rem}
+    .editor-list{display:grid;gap:8px}
+    .editor-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+    .editor-row.multi-3{grid-template-columns:1.1fr 1.3fr 120px auto}
+    .editor-row.multi-2{grid-template-columns:1.4fr 130px auto}
+    .editor-row input[type="color"]{min-height:52px;padding:6px;border-radius:16px;border:2px solid #dfe9f5;background:#fff;width:100%}
+    .editor-row button{padding:12px 14px}
+    .editor-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .editor-empty{padding:10px 12px;border:2px dashed #dbe8f4;border-radius:16px;color:var(--sub);background:#f8fbff;font-weight:700}
+    .hint-chip{display:inline-block;background:#f8fbff;border:2px solid #e0edf8;border-radius:999px;padding:6px 10px;font-size:.82rem;font-weight:800;margin:4px 6px 0 0}
+    .admin-panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 12px;max-width:none;width:100%}
+    .admin-panel-head .eyebrow{display:inline-block;background:#fff7df;border:2px solid #ffd27a;border-radius:999px;padding:6px 10px;font-size:.8rem;font-weight:900;color:#8a5a00;margin-bottom:8px}
+    .admin-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:10px 0 14px;max-width:none;width:100%}
+    .admin-tab-btn{background:#f8fbff;color:var(--navy);border:2px solid #e0edf8;border-radius:16px;padding:12px 10px;font-weight:900;line-height:1.3;box-shadow:none}
+    .admin-tab-btn small{display:block;font-size:.74rem;font-weight:800;color:var(--sub);margin-top:4px}
+    .admin-tab-btn.active{background:linear-gradient(135deg,#68a7ff,#7cc6ff);color:#fff;border-color:transparent}
+    .admin-tab-btn.active small{color:#eef7ff}
+    .admin-tab-pane{display:none;max-width:none;width:100%;margin:0}
+    .admin-tab-pane.active{display:block}
+    .admin-section-title{margin:0 0 8px;font-size:1.06rem;color:var(--navy)}
+    .admin-help-box{background:#f8fbff;border:2px dashed #d6e8f8;border-radius:18px;padding:10px 12px;margin-bottom:12px;font-size:.88rem;line-height:1.7;color:var(--sub)}
+
+    .chart-wrap{background:#fff;border:2px solid #edf3fa;border-radius:20px;padding:12px}
+    canvas{max-width:100%;display:block}
+
+    .aggregate-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+
+    .reports-grid{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(360px,.92fr);gap:16px;align-items:start}
+    .reports-stack{display:grid;gap:16px}
+    .chart-card{background:#ffffff;border:2px solid #e9f1fa;border-radius:22px;padding:14px;min-width:0}
+    .chart-card canvas{width:100%;height:220px!important;max-height:220px;background:linear-gradient(180deg,#ffffff,#fbfdff);border-radius:14px}
+    .chart-table-wrap{overflow:auto;margin-top:10px;max-height:260px}
+    .layout.admin-open .admin-help-box{font-size:.92rem}
+    .layout.admin-open .admin-tabs{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .layout.admin-open .admin-tab-btn{min-height:82px}
+    .layout.admin-open .admin-box{padding:16px;border-style:solid;border-color:#f7e0a8}
+    .layout.admin-open, .layout.admin-open #adminPanel{width:100%;max-width:none}
+    .layout.admin-open #adminPanel > *,
+    .layout.admin-open #adminPanel > * > *,
+    .layout.admin-open .admin-panel-head,
+    .layout.admin-open .admin-tabs,
+    .layout.admin-open .admin-tab-pane,
+    .layout.admin-open .reports-grid,
+    .layout.admin-open .reports-stack{width:100%;max-width:none}
+    .layout.admin-open .reports-grid{grid-template-columns:minmax(0,1.1fr) minmax(420px,.9fr)}
+    .layout.admin-open .chart-card{padding:16px 16px 14px}
+    .layout.admin-open .list-scroll{max-height:460px}
+    .layout.admin-open .chart-card canvas{height:240px!important;max-height:240px}
+    .chart-card h3,.admin-box h3{display:flex;align-items:center;gap:8px}
+    .chart-table-wrap table th{position:sticky;top:0;z-index:1}
+    .history-card .sub{margin-bottom:10px}
+    .history-table-wrap table{font-size:.92rem}
+    .history-chart-box .tiny{margin-top:8px}
+    .history-compact{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,.82fr);gap:14px;align-items:start}
+    .history-card canvas{width:100%;height:170px!important;max-height:170px}
+    .history-chart-box{background:#fff;border:2px solid #edf3fa;border-radius:20px;padding:14px;min-width:0;overflow:hidden}
+    .history-table-wrap{overflow:auto;margin-top:10px;max-height:180px}
+    .history-list{max-height:270px;overflow:auto;padding-right:2px}
+    .history-item{padding:8px 10px;border-radius:16px}
+    .history-item .small-actions button{padding:8px 12px;border-radius:12px}
+    .history-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+    .history-kpi{background:#fff;border:2px solid #e8f0f8;border-radius:18px;padding:12px 10px;text-align:center}
+    .history-kpi .label{font-size:.82rem;color:var(--sub);font-weight:800}
+    .history-kpi strong{display:block;margin-top:6px;font-size:1.25rem;color:var(--navy)}
+    .history-empty{display:flex;align-items:center;justify-content:center;min-height:170px;border:2px dashed #dbe8f4;border-radius:18px;background:linear-gradient(180deg,#ffffff,#fbfdff);text-align:center;padding:16px;color:var(--sub);font-weight:800;line-height:1.8}
+    .admin-pane-shell{display:grid;gap:16px}
+    .admin-wide-card{width:100%;max-width:none}
+    .admin-box,.firebase-box,.chart-card,.reports-grid,.admin-help-box,.admin-tab-pane>div,.admin-tab-pane>section{width:100%;max-width:none}
+    .layout.admin-open #adminPanel{width:100%!important;max-width:100%!important}
+    .layout.admin-open .admin-panel-head,
+    .layout.admin-open .admin-tabs,
+    .layout.admin-open .admin-tab-pane,
+    .layout.admin-open .admin-help-box,
+    .layout.admin-open .admin-box,
+    .layout.admin-open .firebase-box,
+    .layout.admin-open .reports-grid,
+    .layout.admin-open .chart-card{width:100%!important;max-width:100%!important}
+    .layout.admin-open .admin-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .layout.admin-open .admin-tab-pane{padding:0}
+    .layout.admin-open .admin-box,.layout.admin-open .firebase-box,.layout.admin-open .chart-card{border-radius:24px}
+    .layout.admin-open .admin-help-box{padding:12px 16px}
+    .layout.admin-open .panel>section,.layout.admin-open .panel>div{max-width:none}
+    .student-login-card{position:relative;overflow:hidden}
+    .student-login-card:after{content:"";position:absolute;right:-35px;top:-35px;width:120px;height:120px;border-radius:50%;background:rgba(255,122,162,.10);pointer-events:none}
+    .login-status-grid{display:grid;grid-template-columns:minmax(0,1.06fr) minmax(320px,.94fr);gap:16px;align-items:start}
+    .current-student-box,.scan-box{background:#fff;border:2px solid #edf3fa;border-radius:24px;padding:16px}
+    .login-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;font-weight:900;border:2px solid #dbe8f4;background:#f8fbff;color:var(--sub)}
+    .login-pill.on{background:#ebfff3;border-color:#bce9ce;color:#1f7a46}
+    .login-pill.off{background:#fff7f7;border-color:#ffd7d7;color:#a44d4d}
+    .current-student-name{font-size:1.35rem;font-weight:900;margin-top:10px;color:var(--navy)}
+    .screen-mini{font-size:.88rem;line-height:1.7;color:var(--sub);font-weight:700}
+    .screen-only{display:block}
+    .print-only{display:none}
+    .student-login-card{background:linear-gradient(135deg,#fffef8,#f7fbff);border:2px solid #d8e7f7}
+    .round-date-grid{display:grid;gap:10px}
+    .round-date-row{display:grid;grid-template-columns:minmax(220px,1fr) 180px auto;gap:8px;align-items:end}
+    .compact-note{background:#f8fbff;border:2px dashed #d7e7f8;border-radius:16px;padding:10px 12px;color:var(--sub);font-size:.88rem;line-height:1.65}
+    .qr-handout-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .current-student-box .summary-box strong{font-size:1.15rem}
+
+    .wrap{max-width:1600px}
+    .hero,.panel,.card,.main-stack{width:100%}
+    .hero-grid{grid-template-columns:minmax(0,1.08fr) minmax(320px,.92fr)}
+    .top-actions button,.top-actions .btn-like{min-height:52px}
+    .admin-panel-head{padding:4px 2px 0}
+    .admin-header-band{
+      background:linear-gradient(135deg,#fffdf4,#f5fbff);
+      border:2px solid #eef4fb;
+      border-radius:24px;
+      padding:16px 18px;
+      margin-bottom:12px;
+      box-shadow:0 10px 24px rgba(69,104,154,.08);
+    }
+    .admin-header-band h2{font-size:1.5rem;margin:0}
+    .admin-header-band .tiny{margin-top:6px}
+    .admin-summary-row{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:12px;
+      margin:0 0 12px;
+    }
+    .admin-kpi-card{
+      background:linear-gradient(180deg,#ffffff,#fbfdff);
+      border:2px solid #e6eef8;
+      border-radius:22px;
+      padding:14px 14px 12px;
+      min-width:0;
+    }
+    .admin-kpi-card .kpi-label{
+      color:var(--sub);
+      font-size:.82rem;
+      font-weight:800;
+      margin-bottom:8px;
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .admin-kpi-card .kpi-value{
+      font-size:1.65rem;
+      font-weight:900;
+      color:var(--navy);
+      line-height:1.15;
+    }
+    .admin-kpi-card .kpi-sub{
+      margin-top:6px;
+      font-size:.82rem;
+      color:var(--sub);
+      line-height:1.55;
+      min-height:2.5em;
+    }
+    .reports-top-grid{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) minmax(320px,.9fr);
+      gap:16px;
+      align-items:start;
+      margin-bottom:16px;
+    }
+    .dashboard-card{
+      background:linear-gradient(135deg,#fffef9,#f8fbff);
+      border:2px solid #e7eff8;
+      border-radius:24px;
+      padding:16px;
+    }
+    .dashboard-card h3{margin:0 0 8px;color:var(--navy)}
+    .dashboard-list{display:grid;gap:10px;margin-top:10px}
+    .dashboard-item{
+      display:flex;justify-content:space-between;gap:12px;align-items:flex-start;
+      padding:10px 12px;background:#fff;border:2px solid #edf3fa;border-radius:18px;
+    }
+    .dashboard-item strong{display:block}
+    .dashboard-item .meta{font-size:.82rem;color:var(--sub);line-height:1.55}
+    .dashboard-tag{
+      display:inline-flex;align-items:center;justify-content:center;
+      min-width:92px;padding:8px 10px;border-radius:999px;
+      background:#eef7ff;color:#245f9b;font-weight:900;font-size:.82rem;
+    }
+    .history-card{padding:18px}
+    .history-compact{grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr)}
+    .history-empty{
+      min-height:190px;
+      font-size:.96rem;
+      background:radial-gradient(circle at top right, #fff9dd 0, transparent 20%), linear-gradient(180deg,#ffffff,#fbfdff);
+    }
+    .history-chart-box{padding:16px}
+    .history-card canvas{height:190px!important;max-height:190px}
+    .history-table-wrap{max-height:210px}
+    .history-list{max-height:320px}
+    .history-item{padding:10px 12px}
+    .history-item strong{font-size:1rem;color:var(--navy)}
+    .history-item .tiny{margin-top:4px}
+    .student-note-card textarea{min-height:140px}
+    .student-note-card .tiny{margin-top:8px}
+    .empty-card{
+      border:2px dashed #dbe8f4;border-radius:18px;padding:18px;background:#fbfdff;color:var(--sub);font-weight:800;line-height:1.8;
+    }
+    .admin-box,.firebase-box,.chart-card,.dashboard-card{box-shadow:0 8px 18px rgba(69,104,154,.06)}
+    .chart-card canvas{height:250px!important;max-height:250px}
+    .chart-table-wrap{max-height:300px}
+    .qr-card-preview{
+      min-height:260px;
+      background:linear-gradient(180deg,#ffffff,#fbfdff);
+    }
+    .mini-login-card{
+      border:2px solid #edf3fa;
+      border-radius:20px;
+      background:#fff;
+      padding:12px;
+      position:relative;
+      overflow:hidden;
+    }
+    .mini-login-card:after{
+      content:"";
+      position:absolute;right:-24px;top:-24px;width:72px;height:72px;border-radius:50%;
+      background:rgba(104,167,255,.10);
+    }
+    .mini-login-card h4{margin:4px 0 8px;color:var(--navy)}
+    .mini-login-card .meta{font-size:.82rem;color:var(--sub);line-height:1.55}
+    .round-tag{
+      display:inline-flex;
+      padding:6px 10px;
+      border-radius:999px;
+      background:#fff7df;
+      border:1px solid #ffd27a;
+      color:#8a5a00;
+      font-weight:900;
+      font-size:.8rem;
+    }
+    .login-status-grid{grid-template-columns:minmax(0,1.04fr) minmax(340px,.96fr)}
+    .current-student-box,.scan-box,.history-chart-box,.admin-box,.chart-card,.dashboard-card{min-width:0}
+    @media (max-width: 1100px){
+      .admin-summary-row,.reports-top-grid,.history-compact,.login-status-grid{grid-template-columns:1fr}
+    }
+
+    @media (max-width: 1100px){
+      .reports-grid,.history-compact,.hero-grid,.layout{grid-template-columns:1fr}
+      .layout.admin-open .panel{max-width:100%}
+      .admin-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .media-grid{grid-template-columns:repeat(2,1fr)}
+      .round-date-row{grid-template-columns:1fr 1fr auto}
+    }
+    @media (max-width: 720px){
+      .admin-tabs{grid-template-columns:1fr}
+      .grid-2,.grid-3,.aggregate-grid,.login-status-grid,.media-grid{grid-template-columns:1fr}
+      .round-date-row{grid-template-columns:1fr}
+    }
+    .login-status-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;align-items:start}
+    .current-student-box{background:#fff;border:2px solid #edf3fa;border-radius:22px;padding:14px}
+    .current-student-name{font-size:1.35rem;font-weight:900;color:var(--navy);margin:.25rem 0}
+    .login-pill{display:inline-flex;align-items:center;gap:8px;background:#eefaf3;border:2px solid #cfeedd;border-radius:999px;padding:7px 12px;font-weight:800;color:#157347}
+    .login-pill.off{background:#fff4f4;border-color:#ffd1d1;color:#b42318}
+    .scan-box{background:#fff;border:2px dashed #dbe8f4;border-radius:22px;padding:14px}
+    #qrScanner{width:100%;min-height:240px;border-radius:18px;overflow:hidden;background:#f8fbff}
+    .camera-mode-hint{margin-top:8px;font-size:.82rem;color:var(--sub);font-weight:700}
+    .screen-mini{font-size:.82rem;color:var(--sub);line-height:1.6}
+    .hidden-inputs{display:none}
+    .qr-admin-grid{display:grid;grid-template-columns:340px 1fr;gap:14px;align-items:start;margin-top:14px}
+    .qr-card-preview{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;max-height:360px;overflow:auto;padding-right:2px}
+    .mini-login-card{background:#fff;border:2px solid #edf3fa;border-radius:20px;padding:12px}
+    .mini-login-card h4{margin:0 0 6px;font-size:1rem;color:var(--navy)}
+    .mini-login-card .meta{font-size:.85rem;color:var(--sub);line-height:1.6}
+    .mini-login-card .qr-box{display:flex;justify-content:center;align-items:center;min-height:140px;margin:10px 0;background:#fcfeff;border:2px dashed #d8e7f7;border-radius:16px}
+    .mini-login-card .round-tag{display:inline-block;background:#fff7df;border:2px solid #ffd27a;border-radius:999px;padding:4px 10px;font-size:.8rem;font-weight:900;color:#8a5a00}
+    .handout-print-area{display:none;padding:0}
+    .handout-sheet{display:grid;grid-template-columns:repeat(2, 91mm);grid-auto-rows:55mm;gap:3.6mm;justify-content:center;align-content:start}
+    .handout-card{position:relative;width:91mm;height:55mm;break-inside:avoid;page-break-inside:avoid;border:1.2px dashed #93c5fd;border-radius:4mm;background:linear-gradient(135deg,#fffdf3 0%,#eef8ff 60%,#f7f0ff 100%);overflow:hidden;box-shadow:0 8px 18px rgba(56,103,214,.10)}
+    .handout-card::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 12% 18%,rgba(255,210,122,.45) 0 10mm,transparent 10.2mm),radial-gradient(circle at 88% 16%,rgba(129,140,248,.22) 0 10mm,transparent 10.2mm),radial-gradient(circle at 85% 86%,rgba(110,231,183,.24) 0 11mm,transparent 11.2mm);pointer-events:none}
+    .handout-cut{position:absolute;background:#94a3b8;opacity:.95}
+    .handout-cut.top,.handout-cut.bottom{left:50%;transform:translateX(-50%);width:10mm;height:.35mm}
+    .handout-cut.top{top:-1.8mm}.handout-cut.bottom{bottom:-1.8mm}
+    .handout-cut.left,.handout-cut.right{top:50%;transform:translateY(-50%);height:7mm;width:.35mm}
+    .handout-cut.left{left:-1.8mm}.handout-cut.right{right:-1.8mm}
+    .handout-card-inner{position:relative;z-index:1;height:100%;padding:4mm;display:grid;grid-template-rows:auto auto 1fr;gap:2mm}
+    .handout-head{display:flex;justify-content:space-between;gap:2.4mm;align-items:flex-start}
+    .handout-title{font-size:12pt;font-weight:900;color:#ff7a59;line-height:1.15;letter-spacing:.02em}
+    .handout-subtitle{font-size:8.2pt;font-weight:800;color:#475569;margin-top:1mm}
+    .handout-meta{font-size:7.9pt;line-height:1.48;color:#334155}
+    .handout-body{display:grid;grid-template-columns:1fr 23mm;gap:2.4mm;align-items:center;min-height:0}
+    .handout-steps{font-size:7.3pt;line-height:1.5;color:#475569;background:rgba(255,255,255,.88);border:1px solid #cfe8ff;border-radius:3mm;padding:2.2mm}
+    .handout-qr{display:flex;justify-content:center;align-items:center;min-height:23mm;border:1px dashed #93c5fd;border-radius:3mm;background:#fff}
+    .handout-qr canvas,.handout-qr img{width:21mm!important;height:21mm!important}
+    .handout-badge{display:inline-flex;align-items:center;justify-content:center;padding:1.1mm 2.2mm;border-radius:999px;background:#fff7df;border:1px solid #ffd27a;color:#8a5a00;font-size:8pt;font-weight:900;white-space:nowrap}
+    @media (max-width:980px){.login-status-grid,.qr-admin-grid,.reports-grid,.history-compact,.history-kpis{grid-template-columns:1fr}}
+
+
+    .print-report{display:none;background:linear-gradient(135deg,#fffaf1,#f2fbff);border:3px solid #ffd8a8}
+    .report-sheet{background:linear-gradient(180deg,#fffef8 0%,#f8fcff 100%);border:3px solid #ffe0a6;border-radius:28px;padding:18px}
+    .report-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
+    .report-title{font-size:1.6rem;font-weight:900;color:#ff7a59;line-height:1.2}
+    .report-subtitle{font-size:.95rem;color:var(--sub);font-weight:700;margin-top:6px}
+    .report-name-badge{background:#fff;border:3px solid #cfe8ff;border-radius:22px;padding:10px 14px;min-width:230px}
+    .report-name-badge strong{display:block;font-size:1.15rem;color:#2563eb}
+    .report-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0}
+    .metric-card{background:#fff;border:2px solid #e7eef8;border-radius:22px;padding:10px;text-align:center;min-height:96px}
+    .metric-card .emoji{font-size:1.5rem;display:block;margin-bottom:4px}
+    .metric-card .label{font-size:.8rem;font-weight:800;color:var(--sub);line-height:1.3}
+    .metric-card .value{font-size:1.15rem;font-weight:900;margin-top:6px;color:var(--navy)}
+    .report-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:12px}
+    .report-box{background:#fff;border:2px solid #edf3fa;border-radius:22px;padding:12px}
+    .report-box h3{margin:0 0 8px;font-size:1rem;color:var(--navy)}
+    .report-note{background:#fff7df;border:2px dashed #ffd27a;border-radius:18px;padding:10px 12px;font-size:.88rem;line-height:1.65}
+    .report-mini-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.88rem;line-height:1.55}
+    .report-mini-meta div{background:#f8fbff;border:2px solid #edf3fa;border-radius:16px;padding:8px 10px}
+    .mini-table th,.mini-table td{padding:6px;font-size:.83rem}
+    .compact-table-note{font-size:.8rem;color:var(--sub);margin-top:6px}
+        .hide{display:none!important}
+    @media (max-width:1100px){
+      .layout,.hero-grid,.grid-2,.grid-3,.media-grid,.reports-grid,.history-compact{grid-template-columns:1fr}
+    }
+    @page{size:A4 portrait;margin:8mm}
+    @media print{
+      body{background:#fff}
+      .no-print{display:none!important}
+      .wrap{max-width:none;padding:0}
+      .hero,.panel,.card{box-shadow:none;border:1px solid #ccc;background:#fff}
+      .screen-only{display:none!important}
+      .print-only{display:block!important}
+      body.print-individual .print-report{display:block!important}
+      .layout{grid-template-columns:1fr}
+      body.print-individual .hero, body.print-individual .panel, body.print-individual .main-stack > *:not(#individualReport){display:none!important}
+      body.print-individual #individualReport{display:block!important;box-shadow:none;border:none;background:#fff;padding:0;margin:0;break-inside:avoid;page-break-inside:avoid}
+      body.print-individual .print-report{border:none!important}
+      body.print-individual .report-sheet{border:2px solid #bbb!important;padding:10px 12px!important;border-radius:14px}
+      body.print-handouts .hero, body.print-handouts .layout{display:none!important}
+      body.print-handouts .handout-print-area{display:block!important}
+      body.print-handouts .handout-sheet{grid-template-columns:repeat(2,91mm)!important;grid-auto-rows:55mm!important;gap:3.6mm!important;justify-content:center!important}
+      body.print-handouts .handout-card{width:91mm!important;height:55mm!important;box-shadow:none!important}
+      body.print-handouts .handout-card-inner{padding:4mm!important}
+      body.print-handouts .handout-title{font-size:12pt!important}
+      body.print-handouts .handout-subtitle{font-size:8.2pt!important}
+      body.print-handouts .handout-meta{font-size:7.9pt!important;line-height:1.48!important}
+      body.print-handouts .handout-steps{font-size:7.3pt!important;line-height:1.5!important}
+      body.print-handouts .handout-body{grid-template-columns:1fr 23mm!important;gap:2.4mm!important}
+      body.print-handouts .handout-qr{min-height:23mm!important}
+      body.print-individual .report-grid{grid-template-columns:1fr 1fr;gap:8px}
+      body.print-individual .report-metrics{gap:6px;margin:8px 0}
+      body.print-individual .metric-card{min-height:72px;padding:6px;border-radius:14px}
+      body.print-individual .metric-card .emoji{font-size:1.1rem;margin-bottom:2px}
+      body.print-individual .metric-card .label{font-size:.66rem}
+      body.print-individual .metric-card .value{font-size:.92rem;margin-top:2px}
+      body.print-individual .report-title{font-size:1.25rem}
+      body.print-individual .report-subtitle{font-size:.8rem;margin-top:2px}
+      body.print-individual .report-box{padding:8px;border-radius:12px}
+      body.print-individual .report-box h3{font-size:.85rem;margin-bottom:4px}
+      body.print-individual .report-name-badge{min-width:180px;padding:8px 10px;border-radius:14px}
+      body.print-individual .report-name-badge strong{font-size:1rem}
+      body.print-individual .report-note, body.print-individual .report-mini-meta, body.print-individual #individualReportHistory, body.print-individual #individualReportCurrent{font-size:.74rem!important;line-height:1.4}
+      body.print-individual .mini-table th, body.print-individual .mini-table td{padding:4px;font-size:.7rem}
+      body.print-individual canvas{max-height:160px!important}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="hero-grid">
+        <div>
+          <h1>🌈 メディアコントロール<br>ふりかえりアプリ</h1>
+          <p class="lead">小学生向けのやさしい画面で、生活の流れ・メディア時間・5日間のふりかえりをまとめて記録できます。</p>
+          <div class="badge-row">
+            <div class="badge">🏫 学校設定つき</div>
+            <div class="badge">👦 児童選択に対応</div>
+            <div class="badge">📄 CSV入出力OK</div>
+          </div>
+          <div class="top-actions no-print">
+            <button class="ghost" id="adminLoginBtn">🔐 管理者ログイン</button>
+            <button class="ghost hide" id="adminLogoutBtn">🔓 ログアウト</button>
+            <button class="primary" id="saveBtn">💾 回答を保存</button>
+            <button class="secondary" id="printBtn">🖨️ 印刷</button>
+            <button class="warning" id="printIndividualBtn">🧾 個人票印刷</button>
+            <button class="success" id="exportJsonBtn">⬇️ 個人データ保存</button>
+            <label class="btn-like ghost" for="importJsonInput">📂 個人データ読込</label>
+            <input id="importJsonInput" type="file" accept="application/json" style="display:none">
+          </div>
+          <div class="login-pop no-print hide" id="adminLoginBox">
+            <div class="tiny" style="margin-bottom:8px;font-weight:800;">管理者だけが設定画面を開けます。パスワードを入力してください。</div>
+            <div class="login-row">
+              <div class="field" style="margin:0;">
+                <label for="adminPasswordInput">パスワード</label>
+                <input type="password" id="adminPasswordInput" placeholder="admin">
+              </div>
+              <button class="secondary" id="adminLoginSubmitBtn" type="button">ログイン</button>
+              <button class="ghost" id="adminLoginCancelBtn" type="button">閉じる</button>
+            </div>
+          </div>
+        </div>
+        <div class="hero-card">
+          <p><strong>使い方</strong></p>
+          <p>1. 先生が「管理者ログイン」から学校・実施回・児童名簿を設定</p>
+          <p>2. 名簿からQRカードを作成し、児童はQRでログイン</p>
+          <p>3. 回答を保存すると、学校別・実施回別に一覧へ集約</p>
+          <p>4. 児童は過去の記録を見ながら、自分の変化をふり返り可能</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="layout admin-hidden">
+      <aside class="panel no-print hide" id="adminPanel">
+        <div class="admin-header-band admin-panel-head">
+          <div>
+            <div class="eyebrow">🔧 先生用の管理画面</div>
+            <h2>⚙️ 管理者メニュー</h2>
+            <div class="tiny">設定する場所・名簿を整える場所・集計を見る場所を分けて、学校現場で迷わず使える構成にしています。</div>
+          </div>
+        </div>
+
+        <div class="admin-tabs">
+          <button type="button" class="admin-tab-btn active" data-admin-tab="basic">基本設定<small>学校名・実施回・タイトル</small></button>
+          <button type="button" class="admin-tab-btn" data-admin-tab="questions">設問編集<small>項目・時間・設問の変更</small></button>
+          <button type="button" class="admin-tab-btn" data-admin-tab="students">名簿管理<small>児童名簿・CSV</small></button>
+          <button type="button" class="admin-tab-btn" data-admin-tab="reports">集計確認<small>回答一覧・グラフ・分析</small></button>
+        </div>
+
+        <section class="admin-tab-pane active" data-admin-pane="basic">
+          <div class="admin-help-box">このタブでは、アプリ名・学校名・実施回・公開URLなど、運用の土台になる設定だけを整理して行います。実施日は実施回ごとに別々に設定できます。</div>
+
+          <div class="admin-box">
+            <h3 class="admin-section-title">📝 アプリの基本設定</h3>
+            <p class="tiny">配付プリントや児童画面に出るタイトル、公開URL、学校名、実施回ごとの日付をここで整えます。</p>
+            <div class="grid-2">
+              <div class="field">
+                <label>実施タイトル</label>
+                <input type="text" id="projectTitleSetting" placeholder="例：メディアコントロール週間">
+              </div>
+              <div class="field">
+                <label>公開URL（QRログイン用）</label>
+                <input type="text" id="publicBaseUrl" placeholder="例：https://example.github.io/media-control/">
+              </div>
+            </div>
+            <div class="editor-group">
+              <h4>学校名</h4>
+              <div id="schoolNamesEditor" class="editor-list"></div>
+              <div class="editor-toolbar">
+                <button type="button" class="success" id="addSchoolSettingBtn">＋ 学校を追加</button>
+              </div>
+            </div>
+            <div class="editor-group">
+              <h4>実施回と日付</h4>
+              <div class="compact-note">第1回、第2回などの実施回ごとに日付を設定できます。QR配付カードや児童画面の記入日にも反映されます。</div>
+              <div id="roundsEditor" class="round-date-grid"></div>
+              <div class="editor-toolbar">
+                <button type="button" class="success" id="addRoundSettingBtn">＋ 実施回を追加</button>
+              </div>
+            </div>
+            <div class="small-actions">
+              <button class="warning" id="saveSettingsBtn">設定を保存</button>
+            </div>
+          </div>
+
+          <div class="section-gap firebase-box">
+            <h3 class="admin-section-title">☁️ クラウド集約（任意）</h3>
+            <p class="tiny">このHTMLだけでも端末内に集約できます。複数端末から集めたい場合は、Firebase設定を入れると Firestore に保存できます。</p>
+            <details>
+              <summary>Firebase設定をひらく</summary>
+              <div class="field"><label>apiKey</label><input type="text" id="fb_apiKey"></div>
+              <div class="field"><label>authDomain</label><input type="text" id="fb_authDomain"></div>
+              <div class="field"><label>projectId</label><input type="text" id="fb_projectId"></div>
+              <div class="field"><label>storageBucket</label><input type="text" id="fb_storageBucket"></div>
+              <div class="field"><label>messagingSenderId</label><input type="text" id="fb_messagingSenderId"></div>
+              <div class="field"><label>appId</label><input type="text" id="fb_appId"></div>
+              <div class="small-actions">
+                <button class="secondary" id="saveFirebaseBtn">Firebase設定保存</button>
+                <button class="ghost" id="testFirebaseBtn">接続確認</button>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        <section class="admin-tab-pane" data-admin-pane="questions">
+          <div class="admin-help-box">このタブでは、児童が答える設問そのものを編集します。「どんな生活項目を選ばせるか」「メディア時間は何分刻みにするか」などをここで変更します。</div>
+
+          <div class="section-gap admin-box">
+            <h3 class="admin-section-title">🧩 設問と表示内容の設定</h3>
+
+            <div class="field"><label>（1）のタイトル</label><input type="text" id="section1TitleSetting"></div>
+            <div class="field"><label>（1）の説明</label><textarea id="section1HelpSetting" placeholder="30分ごとにクリックして色をぬります。"></textarea></div>
+
+            <div class="editor-group">
+              <h4>（1）生活の流れの項目</h4>
+              <div class="tiny">児童が生活の流れで選ぶ色付きの項目です。必要に応じて増やしたり減らしたりできます。</div>
+              <div style="margin-top:6px">
+                <span class="hint-chip">sleep は睡眠集計</span>
+                <span class="hint-chip">free は自由時間集計</span>
+                <span class="hint-chip">nomedia はノーメディア集計</span>
+                <span class="hint-chip">empty は「けす」</span>
+              </div>
+              <div id="timelineCategoriesEditor" class="editor-list" style="margin-top:10px"></div>
+              <div class="editor-toolbar">
+                <button type="button" class="success" id="addTimelineCategoryBtn">＋ 項目を追加</button>
+              </div>
+            </div>
+
+            <div class="field"><label>（2）のタイトル</label><input type="text" id="section2TitleSetting"></div>
+            <div class="field"><label>（2）の説明</label><textarea id="section2HelpSetting"></textarea></div>
+
+            <div class="editor-group">
+              <h4>（2）メディア時間の選択肢</h4>
+              <div id="mediaOptionsEditor" class="editor-list"></div>
+              <div class="editor-toolbar">
+                <button type="button" class="success" id="addMediaOptionBtn">＋ 時間を追加</button>
+              </div>
+            </div>
+
+            <div class="field"><label>（3-1）のタイトル</label><input type="text" id="section3TitleSetting"></div>
+            <div class="field"><label>（3-1）の説明</label><textarea id="section3HelpSetting"></textarea></div>
+
+            <div class="editor-group">
+              <h4>（3-1）ふり返りの設問</h4>
+              <div id="questionsEditor" class="editor-list"></div>
+              <div class="editor-toolbar">
+                <button type="button" class="success" id="addQuestionBtn">＋ 設問を追加</button>
+              </div>
+            </div>
+
+            <div class="field"><label>（3-2）のタイトル</label><input type="text" id="section4TitleSetting"></div>
+            <div class="field"><label>（3-2）の説明</label><textarea id="section4HelpSetting"></textarea></div>
+
+            <div class="small-actions" style="margin-top:8px">
+              <button class="warning" id="saveSettingsBtn2">この内容を保存</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="admin-tab-pane" data-admin-pane="students">
+          <div class="admin-help-box">このタブでは、児童名簿を登録します。手入力でもCSVでも登録できます。学校ごとに名簿を管理したいときは、先に「アプリの基本設定」で学校名を作成してください。</div>
+
+          <div class="section-gap">
+            <h3 class="admin-section-title">👥 児童名簿</h3>
+            <p class="tiny">CSVは <strong>school,grade,class,name</strong> の4列で読み込めます。旧形式の <strong>grade,class,name</strong> にも対応します。</p>
+            <div class="grid-2">
+              <div class="field"><label>学校名</label><select id="addSchool"></select></div>
+              <div class="field"><label>学年</label><input type="number" id="addGrade" min="1" max="9" placeholder="4"></div>
+              <div class="field"><label>組</label><input type="text" id="addClass" placeholder="1"></div>
+              <div class="field"><label>名前</label><input type="text" id="addName" placeholder="山田 花子"></div>
+            </div>
+            <div class="small-actions">
+              <button class="success" id="addStudentBtn">児童を追加</button>
+              <label class="btn-like ghost" for="studentsCsvInput">CSV読込</label>
+              <input id="studentsCsvInput" type="file" accept=".csv" style="display:none">
+              <button class="ghost" id="downloadStudentsCsvBtn">名簿CSV出力</button>
+              <button class="danger" id="clearStudentsBtn">名簿を全削除</button>
+            </div>
+            <div class="list-scroll" id="studentList"></div>
+          </div>
+
+          <div class="section-gap admin-box">
+            <h3 class="admin-section-title">📇 QRログインカード印刷</h3>
+            <p class="tiny">名簿からQRコード付きの配付カードを作ります。第1回、第2回など実施回ごとのカードをまとめて印刷できます。</p>
+            <div class="qr-admin-grid">
+              <div>
+                <div class="field"><label>印刷する学校</label><select id="qrSchoolFilter"></select></div>
+                <div class="field"><label>印刷する実施回</label><select id="qrRoundFilter"></select></div>
+                <div class="small-actions">
+                  <button class="secondary" id="renderQrCardsBtn" type="button">QRカードを作成</button>
+                  <button class="warning" id="printQrHandoutsBtn" type="button">配付カードを印刷</button>
+                  <button class="ghost" id="downloadQrCsvBtn" type="button">QR一覧CSV出力</button>
+                </div>
+              </div>
+              <div>
+                <div class="qr-card-preview" id="qrCardPreview"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="admin-tab-pane" data-admin-pane="reports">
+          <div class="admin-help-box">このタブでは、回答一覧や学校別の集計を確認します。設定を変える場所ではなく、実施状況を確認するためのタブです。</div>
+
+          <div class="admin-summary-row">
+            <div class="admin-kpi-card"><div class="kpi-label">📝 回答数</div><div class="kpi-value" id="adminKpiResponses">0件</div><div class="kpi-sub" id="adminKpiResponsesSub">まだ回答がありません。</div></div>
+            <div class="admin-kpi-card"><div class="kpi-label">👦 回答した人数</div><div class="kpi-value" id="adminKpiStudents">0人</div><div class="kpi-sub" id="adminKpiStudentsSub">QRログイン後に集計されます。</div></div>
+            <div class="admin-kpi-card"><div class="kpi-label">⏱ 平均メディア時間</div><div class="kpi-value" id="adminKpiAverage">0分</div><div class="kpi-sub" id="adminKpiAverageSub">しぼり込み条件に合わせて表示します。</div></div>
+            <div class="admin-kpi-card"><div class="kpi-label">🏫 登録学校数</div><div class="kpi-value" id="adminKpiSchools">0校</div><div class="kpi-sub" id="adminKpiSchoolsSub">基本設定タブで編集できます。</div></div>
+          </div>
+
+          <div class="reports-top-grid">
+            <div class="dashboard-card">
+              <h3>💡 すぐ分かる実施状況</h3>
+              <div class="tiny">いまのしぼり込み条件で、直近の状況を見やすくまとめます。</div>
+              <div class="dashboard-list" id="adminDashboardList"></div>
+            </div>
+            <div class="dashboard-card">
+              <h3>🎯 活用メモ</h3>
+              <div class="dashboard-list">
+                <div class="dashboard-item"><div><strong>回答一覧を見る</strong><div class="meta">学校や実施回をしぼって、提出状況を確認します。</div></div><span class="dashboard-tag">一覧確認</span></div>
+                <div class="dashboard-item"><div><strong>平均の変化を見る</strong><div class="meta">実施回ごとの平均メディア時間の推移を見て、次回指導の参考にします。</div></div><span class="dashboard-tag">推移確認</span></div>
+                <div class="dashboard-item"><div><strong>学年・学級で比べる</strong><div class="meta">集計確認で平均値を見ながら、学年や学級の傾向をつかめます。</div></div><span class="dashboard-tag">比較分析</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="reports-grid">
+            <div class="reports-stack">
+              <div class="chart-card">
+                <h3 class="admin-section-title">📚 回答一覧・学校別確認</h3>
+                <div class="aggregate-grid" style="margin-bottom:10px">
+                  <div class="field"><label>学校でしぼる</label><select id="adminSchoolFilter"></select></div>
+                  <div class="field"><label>実施回でしぼる</label><select id="adminRoundFilter"></select></div>
+                  <div class="field"><label>表示</label><select id="adminListMode"><option value="all">すべて</option><option value="latest">1人1件の最新のみ</option></select></div>
+                </div>
+                <div class="small-actions">
+                  <button class="secondary" id="downloadResponsesBtn">回答CSV出力</button>
+                  <button class="ghost" id="refreshResponsesBtn">一覧更新</button>
+                  <button class="danger" id="clearResponsesBtn">端末内回答を全削除</button>
+                </div>
+                <div class="list-scroll" id="responseList" style="max-height:420px;margin-top:10px"></div>
+              </div>
+            </div>
+            <div class="reports-stack">
+              <div class="chart-card">
+                <h3 class="admin-section-title">📊 学校別・実施回別の推移</h3>
+                <p class="tiny">学校ごと・実施回ごとの平均メディア時間と回答人数を表示します。</p>
+                <canvas id="adminTrendChart" height="210"></canvas>
+                <div class="chart-table-wrap">
+                  <table id="adminTrendTable"></table>
+                </div>
+              </div>
+
+              <div class="chart-card">
+                <h3 class="admin-section-title">🏫 学年別・学級別集計</h3>
+                <div class="aggregate-grid">
+                  <div class="field"><label>学年でしぼる</label><select id="aggregateGradeFilter"></select></div>
+                  <div class="field"><label>組でしぼる</label><select id="aggregateClassFilter"></select></div>
+                  <div class="field"><label>表示方法</label><select id="aggregateMode"><option value="round">実施回ごと</option><option value="class">学級ごと</option><option value="school">学校ごと</option></select></div>
+                </div>
+                <canvas id="aggregateChart" height="210"></canvas>
+                <div class="chart-table-wrap">
+                  <table id="aggregateTable"></table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="status" id="statusBox"></div>
+      </aside>
+
+      <main class="main-stack">
+        <section class="card student-login-card">
+          <h2>🔑 QRでログイン</h2>
+          <p class="sub">先生からもらったQRコードをタブレットで読み込むと、学校名・学年・組・名前・実施回が自動で入ります。</p>
+          <div class="login-status-grid">
+            <div class="current-student-box">
+              <div id="studentLoginState" class="login-pill off">未ログイン</div>
+              <div class="current-student-name" id="currentStudentName">まだ読み込まれていません</div>
+              <div class="tiny" id="currentStudentMeta">QRコードを読み込んでから入力を始めましょう。</div>
+              <div class="summary-boxes" style="margin-top:12px">
+                <div class="summary-box"><div>取組名</div><strong id="currentProjectTitle">-</strong></div>
+                <div class="summary-box"><div>実施回</div><strong id="currentRoundText">-</strong></div>
+                <div class="summary-box"><div>記入日</div><strong id="currentRecordDate">-</strong></div>
+              </div>
+              <div class="small-actions no-print" style="margin-top:12px">
+                <button class="secondary" id="startQrScanBtn" type="button">📷 カメラでQRを読む</button>
+                <button class="ghost" id="toggleQrCameraBtn" type="button">🤳 インカメラに切替</button>
+                <button class="ghost" id="qrImageBtn" type="button">🖼 写真でQRを読む</button>
+                <button class="ghost" id="stopQrScanBtn" type="button">カメラを閉じる</button>
+                <button class="danger" id="studentLogoutBtn" type="button">ログアウト</button>
+              </div>
+              <div class="camera-mode-hint no-print" id="cameraModeHint">今は 外カメラ を使う設定です。</div>
+            </div>
+            <div class="scan-box no-print">
+              <div class="screen-mini">うまく読み取れないときは、明るい場所でQRを画面の中央に合わせてください。うまく起動しないときは、下の「写真でQRを読む」を使えます。</div>
+              <div id="qrScanner" style="margin-top:10px"></div>
+              <div class="status" id="studentStatusBox" style="display:block;margin-top:10px"></div>
+              <input type="file" id="qrImageInput" accept="image/*" capture="environment" style="display:none" />
+            </div>
+          </div>
+          <div class="hidden-inputs">
+            <select id="schoolSelect"></select>
+            <input type="text" id="projectTitle">
+            <input type="date" id="recordDate">
+            <select id="sessionRoundSelect"></select>
+            <select id="gradeSelect"></select>
+            <select id="classSelect"></select>
+            <select id="studentSelect"></select>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 id="section1Title">🕒 （1）平日の1日の生活の流れを立ててみよう</h2>
+          <p class="sub" id="section1Help">30分ごとにクリックして色をぬります。先に下の「えらぶ」ボタンで活動を選んでください。</p>
+          <div class="timeline-toolbar no-print">
+            <div class="category-picker" id="categoryPicker"></div>
+            <div class="small-actions">
+              <button class="ghost" id="fillSleepBtn">おすすめの睡眠時間を入れる</button>
+              <button class="danger" id="clearTimelineBtn">生活の流れをリセット</button>
+            </div>
+          </div>
+          <div class="timeline">
+            <div class="hour-labels" id="hourLabels"></div>
+            <div class="slot-grid" id="slotGrid"></div>
+          </div>
+          <div class="legend" id="legend"></div>
+          <div class="summary-boxes">
+            <div class="summary-box"><div>すいみん時間</div><strong id="sleepHours">0時間</strong></div>
+            <div class="summary-box"><div>自由時間</div><strong id="freeHours">0時間</strong></div>
+            <div class="summary-box"><div>ノーメディア時間</div><strong id="noMediaHours">0時間</strong></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 id="section2Title">📱 （2）平日の1日のメディア機器使用時間を決めよう</h2>
+          <p class="sub" id="section2Help">学習目的の使用時間はふくめません。選ぶと合計時間が自動で計算されます。</p>
+          <div class="media-grid">
+            <div class="media-card">
+              <div class="icon">📱</div>
+              <h3>スマートフォン</h3>
+              <select data-media="smartphone" class="mediaSelect"></select>
+            </div>
+            <div class="media-card">
+              <div class="icon">💻</div>
+              <h3>タブレット・PC</h3>
+              <select data-media="tabletpc" class="mediaSelect"></select>
+            </div>
+            <div class="media-card">
+              <div class="icon">🎮</div>
+              <h3>ゲーム機</h3>
+              <select data-media="game" class="mediaSelect"></select>
+            </div>
+            <div class="media-card">
+              <div class="icon">📺</div>
+              <h3>テレビ</h3>
+              <select data-media="tv" class="mediaSelect"></select>
+            </div>
+            <div class="media-card total-box">
+              <div class="icon">⏰</div>
+              <h3>合計時間</h3>
+              <div id="mediaTotalText" style="font-size:1.6rem;font-weight:900;margin-top:14px">0分</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 id="section3Title">✅ （3-1）1日の生活をふり返ろう</h2>
+          <p class="sub" id="section3Help">ボタンを押すと、空欄 → ○ → × → ／ の順に変わります。／ は「その日は使わなかった・当てはまらない」です。</p>
+          <div style="overflow:auto">
+            <table id="reflectionTable"></table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 id="section4Title">🧮 （3-2）5日間の合計を数えて記入しよう</h2>
+          <p class="sub" id="section4Help">（3-1）の結果から自動で合計されます。</p>
+          <div style="overflow:auto">
+            <table id="summaryTable"></table>
+          </div>
+        </section>
+
+
+        <section class="card history-card screen-only">
+          <h2>📚 これまでの記録</h2>
+          <p class="sub">同じ名前で保存した過去の回答を、見やすい大きさでまとめて表示します。</p>
+          <div class="small-actions no-print">
+            <button class="ghost" id="refreshHistoryBtn">記録を更新</button>
+          </div>
+          <div id="historySummary" class="tiny">QRログインすると、これまでの記録がここに分かりやすく表示されます。</div>
+          <div class="history-kpis" id="historyKpis">
+            <div class="history-kpi"><div class="label">これまでの回数</div><strong id="historyKpiCount">0回</strong></div>
+            <div class="history-kpi"><div class="label">前回のメディア合計</div><strong id="historyKpiLatestMedia">-</strong></div>
+            <div class="history-kpi"><div class="label">いちばん多かった ○</div><strong id="historyKpiBestOk">-</strong></div>
+          </div>
+          <div class="history-compact" style="margin-top:12px">
+            <div class="history-chart-box">
+              <canvas id="historyChart" height="170"></canvas>
+              <div id="historyEmptyState" class="history-empty hide">まだ個人記録がありません。<br>保存すると、ここにグラフが表示されます。</div>
+              <div class="history-table-wrap">
+                <table id="historyTable"></table>
+              </div>
+            </div>
+            <div class="history-list" id="historyList"></div>
+          </div>
+        </section>
+
+        <section class="card print-report print-only" id="individualReport">
+          <div class="report-sheet">
+            <div class="report-header">
+              <div>
+                <div class="report-title">🌈 メディアコントロール<br>ふりかえりシート</div>
+                <div class="report-subtitle">グラフや表で、今回のがんばりとこれまでの変化がひと目でわかります。</div>
+              </div>
+              <div class="report-name-badge">
+                <div class="tiny">こんかいの きろく</div>
+                <strong id="individualReportName">-</strong>
+                <div id="individualReportMeta" class="tiny"></div>
+              </div>
+            </div>
+
+            <div class="report-metrics">
+              <div class="metric-card"><span class="emoji">📱</span><div class="label">メディア<br>合計</div><div class="value" id="metricMediaTotal">0分</div></div>
+              <div class="metric-card"><span class="emoji">⭕</span><div class="label">できた<br>数</div><div class="value" id="metricOkTotal">0こ</div></div>
+              <div class="metric-card"><span class="emoji">😴</span><div class="label">すいみん<br>時間</div><div class="value" id="metricSleep">0時間</div></div>
+              <div class="metric-card"><span class="emoji">🌱</span><div class="label">自由<br>時間</div><div class="value" id="metricFree">0時間</div></div>
+              <div class="metric-card"><span class="emoji">🚫</span><div class="label">ノーメディア<br>時間</div><div class="value" id="metricNoMedia">0時間</div></div>
+            </div>
+
+            <div class="report-grid">
+              <div class="report-box">
+                <h3>📈 これまでのへんか</h3>
+                <canvas id="individualTrendChart" height="155"></canvas>
+                <div id="individualReportHistory" class="tiny" style="margin-top:8px"></div>
+              </div>
+              <div class="report-box">
+                <h3>💬 ふりかえりメモ</h3>
+                <div id="individualReportCurrent" class="report-note"></div>
+                <div id="individualReportGuardian" class="report-note" style="margin-top:8px;background:#f8fbff;border-color:#cfe1f7"></div>
+                <div class="report-mini-meta" style="margin-top:8px">
+                  <div id="reportRoundMeta">実施回：-</div>
+                  <div id="reportDateMeta">記入日：-</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="report-box" style="margin-top:10px">
+              <h3>📋 これまでのきろく（新しい順に4件まで）</h3>
+              <table class="mini-table" id="individualReportTable"></table>
+              <div class="compact-table-note">※ 1回分が1ページにおさまるように、一覧は最新4件まで表示しています。</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card screen-only">
+          <h2>📝 ひとことメモ</h2>
+          <div class="field">
+            <label>じぶんのふりかえり</label>
+            <textarea id="studentNote" placeholder="がんばれたことや、これから気をつけたいことを書こう。"></textarea>
+          </div>
+          <textarea id="guardianNote" style="display:none"></textarea>
+          <div class="footer-note">
+            このアプリは、配付資料の流れに合わせて「生活の流れ」「メディア時間」「5日間の振り返り」をまとめて扱えるようにした試作版です。<br>
+            端末内保存はすぐ使えます。複数端末からの集約には Firebase 設定が必要です。
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <section class="handout-print-area print-only" id="handoutPrintArea">
+    <div class="handout-sheet" id="handoutSheet"></div>
+  </section>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
+    import { getFirestore, doc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+
+    const SETTINGS_KEY = 'mediaControlSettingsV2';
+    const STUDENTS_KEY = 'mediaControlStudentsV2';
+    const RESPONSES_KEY = 'mediaControlResponsesV2';
+    const FIREBASE_KEY = 'mediaControlFirebaseV2';
+    const ADMIN_SESSION_KEY = 'mediaControlAdminUnlockedV1';
+    const STUDENT_LOGIN_KEY = 'mediaControlStudentLoginV1';
+
+    const DEFAULT_SETTINGS = {
+      schools: [],
+      projectTitle: '',
+      projectDate: '',
+      rounds: ['第1回'],
+      roundDateMap: {'第1回':''},
+      section1Title: '🕒 （1）平日の1日の生活の流れを立ててみよう',
+      section1Help: '30分ごとにクリックして色をぬります。先に下の「えらぶ」ボタンで活動を選んでください。',
+      timelineCategories: [
+        {key:'sleep', label:'すいみん', color:'#9b8cff'},
+        {key:'breakfast', label:'朝食', color:'#ffcf70'},
+        {key:'prep', label:'準備', color:'#8ad4ff'},
+        {key:'school', label:'学校', color:'#68a7ff'},
+        {key:'homework', label:'宿題', color:'#ffb347'},
+        {key:'free', label:'自由', color:'#56d39b'},
+        {key:'dinner', label:'夕食', color:'#ff9f80'},
+        {key:'bath', label:'おふろ', color:'#5cd6ea'},
+        {key:'nomedia', label:'ノーメディア', color:'#4f5d75'},
+        {key:'empty', label:'けす', color:'#e5e7eb'}
+      ],
+      section2Title: '📱 （2）平日の1日のメディア機器使用時間を決めよう',
+      section2Help: '学習目的の使用時間はふくめません。選ぶと合計時間が自動で計算されます。',
+      mediaOptions: [
+        {label:'使わない', value:0},
+        {label:'30分', value:30},
+        {label:'1時間', value:60},
+        {label:'1時間30分', value:90},
+        {label:'2時間', value:120},
+        {label:'2時間30分', value:150},
+        {label:'3時間', value:180}
+      ],
+      section3Title: '✅ （3-1）1日の生活をふり返ろう',
+      section3Help: 'ボタンを押すと、空欄 → ○ → × → ／ の順に変わります。／ は「その日は使わなかった・当てはまらない」です。',
+      reflectionQuestions: [
+        'スマートフォンの使用時間が守れた',
+        'タブレット・パソコンの使用時間が守れた',
+        'ゲーム機の使用時間が守れた',
+        'テレビの視聴時間が守れた',
+        '合計時間が守れた',
+        '前日、寝る1時間前にメディア機器を使わなかった'
+      ],
+      section4Title: '🧮 （3-2）5日間の合計を数えて記入しよう',
+      section4Help: '（3-1）の結果から自動で合計されます。'
+    };
+
+    function getSettings(){
+      const legacy = loadJson(SETTINGS_KEY, {});
+      const s = Object.assign({}, DEFAULT_SETTINGS, legacy);
+      if(!Array.isArray(s.schools)) s.schools = s.schoolName ? [s.schoolName] : [];
+      if(!Array.isArray(s.rounds) || !s.rounds.length) s.rounds = ['第1回'];
+      if(!s.roundDateMap || typeof s.roundDateMap !== 'object') s.roundDateMap = {};
+      s.rounds.forEach(r=>{ if(!(r in s.roundDateMap)) s.roundDateMap[r] = ''; });
+      if(!Array.isArray(s.timelineCategories) || !s.timelineCategories.length) s.timelineCategories = structuredClone(DEFAULT_SETTINGS.timelineCategories);
+      const legacyTimelineKeySets = [
+        ['sleep','school','homework','free','bath','meal','media','nomedia','other','empty'].join('|'),
+        ['sleep','breakfast','prep','school','homework','free','dinner','bath','free2','nomedia','empty'].join('|')
+      ];
+      const currentTimelineKeys = (s.timelineCategories || []).map(item => item?.key || '').join('|');
+      if(legacyTimelineKeySets.includes(currentTimelineKeys)) s.timelineCategories = structuredClone(DEFAULT_SETTINGS.timelineCategories);
+      if(!Array.isArray(s.mediaOptions) || !s.mediaOptions.length) s.mediaOptions = structuredClone(DEFAULT_SETTINGS.mediaOptions);
+      if(!Array.isArray(s.reflectionQuestions) || !s.reflectionQuestions.length) s.reflectionQuestions = structuredClone(DEFAULT_SETTINGS.reflectionQuestions);
+      return s;
+    }
+
+    function getTimelineCategories(){ return getSettings().timelineCategories || []; }
+    function getMediaOptions(){ return getSettings().mediaOptions || []; }
+    function getReflectionQuestions(){ return getSettings().reflectionQuestions || []; }
+    const days = ['月','火','水','木','金'];
+    const markCycle = ['', '○', '×', '／'];
+
+    const el = id => document.getElementById(id);
+    const statusBox = el('statusBox');
+
+    let currentCategory = 'sleep';
+    let timeline = Array(48).fill('empty');
+    let reflection = getReflectionQuestions().map(()=> Array(5).fill(''));
+    let firebaseApp = null;
+    let firestoreDb = null;
+    let loadedHistoryPayload = null;
+    let currentStudentLogin = loadJson(STUDENT_LOGIN_KEY, null);
+    let qrScanner = null;
+    let qrFacingMode = 'environment';
+
+    function showStatus(message){
+      if(statusBox){
+        statusBox.textContent = message;
+        statusBox.classList.add('show');
+        clearTimeout(showStatus.timer);
+        showStatus.timer = setTimeout(()=> statusBox.classList.remove('show'), 3000);
+      }
+      showStudentStatus(message);
+    }
+
+    function showStudentStatus(message, isError=false){
+      const box = el('studentStatusBox');
+      if(!box) return;
+      box.textContent = message;
+      box.classList.add('show');
+      box.style.background = isError ? '#fff4f4' : '#eef7ff';
+      box.style.borderColor = isError ? '#ffd1d1' : '#d9ecff';
+      box.style.color = isError ? '#b42318' : '#245f9b';
+      clearTimeout(showStudentStatus.timer);
+      showStudentStatus.timer = setTimeout(()=> box.classList.remove('show'), 5000);
+    }
+
+    function loadJson(key, fallback){
+      try{return JSON.parse(localStorage.getItem(key)) ?? fallback;}catch{return fallback;}
+    }
+    function saveJson(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+
+    function escapeHtml(str=''){
+      return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    function initHourLabels(){
+      const wrap = el('hourLabels');
+      wrap.innerHTML = '';
+      for(let i=0;i<24;i++){
+        const d = document.createElement('div');
+        d.textContent = `${i}時`;
+        wrap.appendChild(d);
+      }
+    }
+
+    function renderCategoryPicker(){
+      const wrap = el('categoryPicker');
+      const legend = el('legend');
+      wrap.innerHTML = '';
+      legend.innerHTML = '';
+      getTimelineCategories().filter(cat => cat.key !== 'empty').forEach(cat => {
+        const b = document.createElement('button');
+        b.type='button';
+        b.className = 'cat-btn' + (currentCategory===cat.key ? ' active' : '');
+        b.textContent = cat.label;
+        b.style.borderColor = cat.color;
+        b.addEventListener('click', ()=>{
+          currentCategory = cat.key;
+          renderCategoryPicker();
+        });
+        wrap.appendChild(b);
+
+        const l = document.createElement('div');
+        l.className = 'legend-item';
+        l.innerHTML = `<span class="sw" style="background:${cat.color}"></span>${cat.label}`;
+        legend.appendChild(l);
+      });
+    }
+
+    function slotLabel(key){
+      const cat = getTimelineCategories().find(c=>c.key===key);
+      if(!cat) return '';
+      return cat.label.length <= 4 ? cat.label : cat.label.slice(0,4);
+    }
+
+    function renderTimeline(){
+      const grid = el('slotGrid');
+      grid.innerHTML = '';
+      timeline.forEach((cat, idx)=>{
+        const slot = document.createElement('div');
+        slot.className = `slot`;
+        const found = getTimelineCategories().find(c=>c.key===cat) || {key:'empty',label:'',color:'#e5e7eb'};
+        slot.textContent = slotLabel(cat);
+        slot.style.background = found.color || '#e5e7eb';
+        slot.style.color = (found.key==='empty' ? '#64748b' : '#fff');
+        slot.title = `${Math.floor(idx/2)}:${idx%2===0?'00':'30'}〜 ${found.label || '未入力'}`;
+        slot.addEventListener('click', ()=>{
+          timeline[idx] = (timeline[idx] === currentCategory) ? 'empty' : currentCategory;
+          renderTimeline();
+          updateTimelineSummary();
+        });
+        grid.appendChild(slot);
+      });
+    }
+
+    function minutesToText(min){
+      const h = Math.floor(min/60);
+      const m = min%60;
+      if(h && m) return `${h}時間${m}分`;
+      if(h) return `${h}時間`;
+      return `${m}分`;
+    }
+
+    function updateTimelineSummary(){
+      const sleep = timeline.filter(x=>x==='sleep').length * 30;
+      const free = timeline.filter(x=>x==='free').length * 30;
+      const nomedia = timeline.filter(x=>x==='nomedia').length * 30;
+      el('sleepHours').textContent = minutesToText(sleep);
+      el('freeHours').textContent = minutesToText(free);
+      el('noMediaHours').textContent = minutesToText(nomedia);
+    }
+
+    function fillRecommendedSleep(){
+      timeline = Array(48).fill('empty');
+      for(let i=42;i<48;i++) timeline[i] = 'sleep';
+      for(let i=0;i<12;i++) timeline[i] = 'sleep';
+      timeline[12]='meal'; timeline[13]='school';
+      renderTimeline(); updateTimelineSummary();
+    }
+
+    function populateMediaSelects(){
+      document.querySelectorAll('.mediaSelect').forEach(sel=>{
+        sel.innerHTML = getMediaOptions().map(opt=>`<option value="${opt.value}">${opt.label}</option>`).join('');
+        sel.addEventListener('change', updateMediaTotal);
+      });
+      updateMediaTotal();
+    }
+
+    function updateMediaTotal(){
+      const total = [...document.querySelectorAll('.mediaSelect')].reduce((sum, sel)=> sum + Number(sel.value || 0), 0);
+      el('mediaTotalText').textContent = minutesToText(total);
+    }
+
+    function renderReflectionTable(){
+      const table = el('reflectionTable');
+      let html = '<tr><th>項目</th>' + days.map(d=>`<th>${d}</th>`).join('') + '</tr>';
+      getReflectionQuestions().forEach((q, qi)=>{
+        html += `<tr><th style="text-align:left">問${qi+1}　${escapeHtml(q)}</th>`;
+        days.forEach((_, di)=>{
+          const mark = reflection[qi][di];
+          const cls = mark === '○' ? 'mark-ok' : mark === '×' ? 'mark-ng' : mark === '／' ? 'mark-skip' : 'mark-empty';
+          html += `<td><button type="button" class="cycle-btn ${cls}" data-q="${qi}" data-d="${di}">${mark || '　'}</button></td>`;
+        });
+        html += '</tr>';
+      });
+      table.innerHTML = html;
+      table.querySelectorAll('.cycle-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const q = Number(btn.dataset.q), d = Number(btn.dataset.d);
+          const current = reflection[q][d];
+          reflection[q][d] = markCycle[(markCycle.indexOf(current)+1) % markCycle.length];
+          renderReflectionTable();
+          renderSummaryTable();
+        });
+      });
+    }
+
+    function renderSummaryTable(){
+      const table = el('summaryTable');
+      let html = '<tr><th>項目</th><th>○の数</th><th>×の数</th><th>／の数</th></tr>';
+      getReflectionQuestions().forEach((q, qi)=>{
+        const counts = { '○':0, '×':0, '／':0 };
+        reflection[qi].forEach(m=>{ if(counts[m] !== undefined) counts[m]++; });
+        html += `<tr><th style="text-align:left">問${qi+1}　${escapeHtml(q)}</th><td>${counts['○']}</td><td>${counts['×']}</td><td>${counts['／']}</td></tr>`;
+      });
+      table.innerHTML = html;
+    }
+
+    function makeStudentId(){ return 'stu_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+    function getStudents(){
+      const raw = loadJson(STUDENTS_KEY, []);
+      let changed = false;
+      const normalized = raw.map(s=>{
+        if(!s.id){ changed = true; return Object.assign({id: makeStudentId()}, s); }
+        return s;
+      });
+      if(changed) saveJson(STUDENTS_KEY, normalized);
+      return normalized;
+    }
+    function getResponses(){ return loadJson(RESPONSES_KEY, []); }
+    function getFirebaseConfig(){ return loadJson(FIREBASE_KEY, {}); }
+    function getRounds(){ const r = getSettings().rounds || []; return r.length ? r : ['第1回']; }
+    function getRoundDate(round){ const map = getSettings().roundDateMap || {}; return map[round] || ''; }
+
+    function getSchools(){
+      const schools = (getSettings().schools || []).map(s=>String(s).trim()).filter(Boolean);
+      return schools.length ? schools : [''];
+    }
+
+    function saveStudentLogin(login){
+      currentStudentLogin = login;
+      saveJson(STUDENT_LOGIN_KEY, login);
+      renderLoggedInStudent();
+    }
+
+    function encodeLoginPayload(student, round){
+      const payload = {
+        studentId: student.id,
+        schoolName: student.school || '',
+        grade: String(student.grade || ''),
+        className: String(student.class || ''),
+        studentName: student.name || '',
+        sessionRound: round || ''
+      };
+      return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    }
+
+    function decodeLoginPayload(token){
+      try{
+        return JSON.parse(decodeURIComponent(escape(atob(token))));
+      }catch(_){
+        return null;
+      }
+    }
+
+    function getPublicBaseUrl(){
+      return (el('publicBaseUrl')?.value || getSettings().publicBaseUrl || '').trim();
+    }
+
+    function buildLoginQrText(student, round){
+      const token = encodeLoginPayload(student, round);
+      const base = getPublicBaseUrl();
+      if(base){
+        const sep = base.includes('?') ? '&' : '?';
+        return `${base}${sep}login=${encodeURIComponent(token)}`;
+      }
+      return token;
+    }
+
+    async function applyLoginFromUrl(){
+      try{
+        const url = new URL(window.location.href);
+        const token = url.searchParams.get('login') || url.searchParams.get('token') || '';
+        if(!token) return false;
+        const login = decodeLoginPayload(token);
+        if(login && login.studentName){
+          saveStudentLogin(login);
+          applyStudentLogin(login);
+          showStudentStatus('QRからログインしました。');
+          return true;
+        }
+      }catch(err){
+        console.error(err);
+      }
+      return false;
+    }
+
+    function applyStudentLogin(login){
+      if(!login) return;
+      renderSchoolSelectors();
+      el('schoolSelect').value = login.schoolName || '';
+      renderRoundSelector();
+      if(login.sessionRound) el('sessionRoundSelect').value = login.sessionRound;
+      renderStudentSelectors();
+      if(login.grade) el('gradeSelect').value = String(login.grade);
+      el('gradeSelect').dispatchEvent(new Event('change'));
+      if(login.className) el('classSelect').value = String(login.className);
+      el('classSelect').dispatchEvent(new Event('change'));
+      if(login.studentName) el('studentSelect').value = login.studentName;
+      const s = getSettings();
+      el('projectTitle').value = s.projectTitle || '';
+      el('recordDate').value = getRoundDate(login.sessionRound || el('sessionRoundSelect').value) || s.projectDate || new Date().toISOString().slice(0,10);
+      if(el('publicBaseUrl')) el('publicBaseUrl').value = s.publicBaseUrl || '';
+      renderHistoryList();
+      renderIndividualReport();
+      showStatus('QRログインしました。');
+    }
+
+    function renderLoggedInStudent(){
+      const state = el('studentLoginState');
+      const name = el('currentStudentName');
+      const meta = el('currentStudentMeta');
+      const project = el('currentProjectTitle');
+      const round = el('currentRoundText');
+      const date = el('currentRecordDate');
+      const s = getSettings();
+      if(currentStudentLogin && currentStudentLogin.studentName){
+        project.textContent = s.projectTitle || '未設定';
+        date.textContent = (getRoundDate(currentStudentLogin?.sessionRound || el('sessionRoundSelect').value) || el('recordDate').value || s.projectDate || '-');
+        state.textContent = 'ログイン中';
+        state.className = 'login-pill on';
+        name.textContent = currentStudentLogin.studentName;
+        meta.textContent = `${currentStudentLogin.schoolName || ''} ${currentStudentLogin.grade || ''}年 ${currentStudentLogin.className || ''}組 ／ ${currentStudentLogin.sessionRound || ''}`.trim();
+        round.textContent = currentStudentLogin.sessionRound || '-';
+      }else{
+        project.textContent = '-';
+        date.textContent = '-';
+        state.textContent = '未ログイン';
+        state.className = 'login-pill off';
+        name.textContent = 'まだ読み込まれていません';
+        meta.textContent = 'QRコードを読み込んでから入力を始めましょう。';
+        round.textContent = '-';
+      }
+    }
+
+    function updateQrCameraUi(){
+      const btn = el('toggleQrCameraBtn');
+      const hint = el('cameraModeHint');
+      const input = el('qrImageInput');
+      if(btn) btn.textContent = qrFacingMode === 'environment' ? '🤳 インカメラに切替' : '📷 外カメラに切替';
+      if(hint) hint.textContent = qrFacingMode === 'environment' ? '今は 外カメラ を使う設定です。必要ならインカメラに切り替えられます。' : '今は インカメラ を使う設定です。外カメラへ戻すこともできます。';
+      if(input) input.setAttribute('capture', qrFacingMode === 'environment' ? 'environment' : 'user');
+    }
+
+    async function getPreferredQrCameraStartTarget(){
+      if(window.Html5Qrcode && typeof Html5Qrcode.getCameras === 'function'){
+        try{
+          const cameras = await Html5Qrcode.getCameras();
+          if(cameras && cameras.length){
+            const prefersFront = qrFacingMode === 'user';
+            const strong = prefersFront
+              ? [/front/i,/user/i,/face/i,/facetime/i,/前/i,/内/i]
+              : [/back/i,/rear/i,/environment/i,/world/i,/外/i,/後/i];
+            const weak = prefersFront
+              ? [/camera\s*1/i,/cam\s*1/i]
+              : [/camera\s*0/i,/cam\s*0/i];
+            let picked = cameras.find(cam => strong.some(re => re.test(cam.label || '')))
+              || cameras.find(cam => weak.some(re => re.test(cam.label || '')))
+              || (prefersFront ? cameras[cameras.length - 1] : cameras[0]);
+            return { startTarget: picked.id, cameraLabel: picked.label || '' };
+          }
+        }catch(err){
+          console.warn('getCameras failed', err);
+        }
+      }
+      return { startTarget: { facingMode: qrFacingMode }, cameraLabel: '' };
+    }
+
+    async function toggleQrCameraFacingMode(){
+      qrFacingMode = qrFacingMode === 'environment' ? 'user' : 'environment';
+      updateQrCameraUi();
+      if(qrScanner){
+        await startQrScanner();
+      }
+      showStudentStatus(qrFacingMode === 'environment' ? '外カメラに切り替えました。' : 'インカメラに切り替えました。');
+    }
+
+    async function stopQrScanner(){
+      try{ if(qrScanner){ await qrScanner.stop(); await qrScanner.clear(); } }catch(_){}
+      qrScanner = null;
+      const box = el('qrScanner');
+      if(box) box.innerHTML = '';
+    }
+
+    async function handleDecodedLoginText(decodedText){
+      const login = decodeLoginPayload(decodedText);
+      if(login && login.studentName){
+        saveStudentLogin(login);
+        applyStudentLogin(login);
+        await stopQrScanner();
+        showStudentStatus('QRを読み取りました。ログインしました。');
+        return true;
+      }
+      showStudentStatus('QRコードの内容を読み取れませんでした。', true);
+      return false;
+    }
+
+    async function decodeQrFromImageFile(file){
+      if(!file) return;
+      const objectUrl = URL.createObjectURL(file);
+      try{
+        const img = new Image();
+        await new Promise((resolve, reject)=>{
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = objectUrl;
+        });
+        if('BarcodeDetector' in window){
+          try{
+            const detector = new BarcodeDetector({formats:['qr_code']});
+            const codes = await detector.detect(img);
+            if(codes && codes[0] && codes[0].rawValue){
+              await handleDecodedLoginText(codes[0].rawValue);
+              return;
+            }
+          }catch(err){
+            console.warn('BarcodeDetector failed', err);
+          }
+        }
+        if(window.jsQR){
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+          if(code && code.data){
+            await handleDecodedLoginText(code.data);
+            return;
+          }
+        }
+        showStudentStatus('写真からQRを読み取れませんでした。スクリーンショットではなく、元の写真や配付用QRを大きく写した画像で試してください。', true);
+      }catch(err){
+        console.error(err);
+        showStudentStatus('写真の読み込みに失敗しました。', true);
+      }finally{
+        URL.revokeObjectURL(objectUrl);
+        const input = el('qrImageInput');
+        if(input) input.value = '';
+      }
+    }
+
+    async function startQrScanner(){
+      const target = el('qrScanner');
+      if(!target) return;
+      if(!window.isSecureContext){
+        showStudentStatus('この開き方ではカメラ起動が制限されています。下の「写真でQRを読む」を使うか、HTTPSで開いてください。', true);
+        return;
+      }
+      if(!(window.Html5Qrcode)){
+        showStudentStatus('QR読み取りライブラリを読み込めませんでした。下の「写真でQRを読む」を試してください。', true);
+        return;
+      }
+      await stopQrScanner();
+      qrScanner = new Html5Qrcode('qrScanner');
+      try{
+        showStudentStatus('カメラを起動しています。カメラの使用を許可してください。');
+        const preferred = await getPreferredQrCameraStartTarget();
+        await qrScanner.start(
+          preferred.startTarget,
+          { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1 },
+          async (decodedText)=>{
+            await handleDecodedLoginText(decodedText);
+          },
+          ()=>{}
+        );
+        if(preferred.cameraLabel){
+          const modeText = qrFacingMode === 'environment' ? '外カメラ' : 'インカメラ';
+          showStudentStatus(`${modeText}でカメラを起動しました。`);
+        }
+      }catch(err){
+        console.error(err);
+        showStudentStatus('カメラを起動できませんでした。カメラの使用を許可するか、「写真でQRを読む」を使ってください。', true);
+      }
+    }
+
+    function renderQrAdminFilters(){
+      const schoolSel = el('qrSchoolFilter');
+      const roundSel = el('qrRoundFilter');
+      if(!schoolSel || !roundSel) return;
+      const schools = getSchools().filter(Boolean);
+      const currentSchool = schoolSel.value;
+      schoolSel.innerHTML = '<option value="">すべての学校</option>' + schools.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+      if(schools.includes(currentSchool)) schoolSel.value = currentSchool;
+      const rounds = getRounds();
+      const currentRound = roundSel.value;
+      roundSel.innerHTML = rounds.map(r=>`<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+      if(rounds.includes(currentRound)) roundSel.value = currentRound;
+      if(!roundSel.value && rounds[0]) roundSel.value = rounds[0];
+    }
+
+    function getQrTargetStudents(){
+      const school = el('qrSchoolFilter')?.value || '';
+      return getStudents().filter(s=>!school || String(s.school||'')===String(school))
+        .sort((a,b)=> String(a.school||'').localeCompare(String(b.school||''),'ja') || Number(a.grade)-Number(b.grade) || String(a.class).localeCompare(String(b.class),'ja') || String(a.name).localeCompare(String(b.name),'ja'));
+    }
+
+    function renderQrCardsPreview(){
+      const wrap = el('qrCardPreview');
+      if(!wrap) return;
+      const round = el('qrRoundFilter')?.value || getRounds()[0] || '';
+      const students = getQrTargetStudents();
+      if(!students.length){ wrap.innerHTML = '<div class="editor-empty">名簿がありません。先に児童名簿を登録してください。</div>'; return; }
+      wrap.innerHTML = '';
+      students.forEach((student, idx)=>{
+        const card = document.createElement('div');
+        card.className = 'mini-login-card';
+        const qrId = `qr_preview_${idx}`;
+        card.innerHTML = `
+          <div class="round-tag">${escapeHtml(round)}</div>
+          <h4>${escapeHtml(student.name)}</h4>
+          <div class="meta">${escapeHtml(student.school||'')}<br>${escapeHtml(String(student.grade))}年 ${escapeHtml(String(student.class))}組</div>
+          <div class="qr-box"><div id="${qrId}"></div></div>
+        `;
+        wrap.appendChild(card);
+        const token = buildLoginQrText(student, round);
+        new QRCode(document.getElementById(qrId), { text: token, width: 128, height: 128, correctLevel: QRCode.CorrectLevel.M });
+      });
+      buildHandoutSheet();
+    }
+
+    function buildHandoutSheet(){
+      const sheet = el('handoutSheet');
+      if(!sheet) return;
+      const round = el('qrRoundFilter')?.value || getRounds()[0] || '';
+      const title = el('projectTitleSetting').value.trim() || getSettings().projectTitle || 'メディアコントロール';
+      const date = getRoundDate(round) || '';
+      const students = getQrTargetStudents();
+      sheet.innerHTML = '';
+      students.forEach((student, idx)=>{
+        const card = document.createElement('div');
+        card.className = 'handout-card';
+        const qrid = `handout_qr_${idx}`;
+        const token = buildLoginQrText(student, round);
+        card.dataset.token = token;
+        card.innerHTML = `
+          <span class="handout-cut top"></span><span class="handout-cut bottom"></span><span class="handout-cut left"></span><span class="handout-cut right"></span>
+          <div class="handout-card-inner">
+            <div class="handout-head">
+              <div>
+                <div class="handout-title">🌈 ${escapeHtml(round)} のログインカード</div>
+                <div class="handout-subtitle">${escapeHtml(title)}</div>
+              </div>
+              <div class="handout-badge">${escapeHtml(round)}</div>
+            </div>
+            <div class="handout-meta">🏫 ${escapeHtml(student.school||'')}<br>👦 ${escapeHtml(String(student.grade))}年 ${escapeHtml(String(student.class))}組　${escapeHtml(student.name)} さん${date ? '<br>🗓 ' + escapeHtml(date) : ''}</div>
+            <div class="handout-body">
+              <div class="handout-steps">・タブレットでアプリをひらきます。<br>・標準カメラ または「カメラでQRを読む」で、このQRをよみます。<br>・よみこむと、そのままログインできます。</div>
+              <div class="handout-qr"><div id="${qrid}"></div></div>
+            </div>
+          </div>
+        `;
+        sheet.appendChild(card);
+        new QRCode(document.getElementById(qrid), { text: token, width: 120, height: 120, correctLevel: QRCode.CorrectLevel.M });
+      });
+    }
+
+    function printQrHandouts(){
+      const round = el('qrRoundFilter')?.value || getRounds()[0] || '';
+      const students = getQrTargetStudents();
+      if(!students.length){ showStatus('配付カードを作るための名簿がありません。'); return; }
+      buildHandoutSheet();
+      showStatus(`${round || '配付カード'} の印刷画面を開きます。`);
+      setTimeout(()=>{
+        document.body.classList.add('print-handouts');
+        window.print();
+        setTimeout(()=>document.body.classList.remove('print-handouts'), 500);
+      }, 180);
+    }
+
+    function exportQrCsv(){
+      const round = el('qrRoundFilter')?.value || getRounds()[0] || '';
+      const rows = [['school','grade','class','name','round','qrToken']];
+      getQrTargetStudents().forEach(s=> rows.push([s.school||'', s.grade, s.class, s.name, round, buildLoginQrText(s, round)]));
+      downloadCsv(`qr_login_${round}.csv`, rows);
+    }
+
+    function findStudentByCurrentLogin(){
+      if(!currentStudentLogin) return null;
+      return getStudents().find(s => String(s.id||'')===String(currentStudentLogin.studentId||'') || (String(s.school||'')===String(currentStudentLogin.schoolName||'') && String(s.grade||'')===String(currentStudentLogin.grade||'') && String(s.class||'')===String(currentStudentLogin.className||'') && String(s.name||'')===String(currentStudentLogin.studentName||'')));
+    }
+
+    function resetStudentWorkspace(){
+      timeline = Array(48).fill('empty');
+      reflection = getReflectionQuestions().map(()=> Array(5).fill(''));
+      loadedHistoryPayload = null;
+      currentCategory = getTimelineCategories()[0]?.key || 'sleep';
+      renderCategoryPicker();
+      renderTimeline();
+      updateTimelineSummary();
+      renderReflectionTable();
+      renderSummaryTable();
+      document.querySelectorAll('.mediaSelect').forEach(sel=> sel.value = '0');
+      updateMediaTotal();
+      el('studentNote').value = '';
+      el('guardianNote').value = '';
+      el('projectTitle').value = '';
+      const schoolSel = el('schoolSelect');
+      const gradeSel = el('gradeSelect');
+      const classSel = el('classSelect');
+      const studentSel = el('studentSelect');
+      const roundSel = el('sessionRoundSelect');
+      if(schoolSel) schoolSel.value = '';
+      if(gradeSel) gradeSel.innerHTML = '<option value="">-</option>';
+      if(classSel) classSel.innerHTML = '<option value="">-</option>';
+      if(studentSel) studentSel.innerHTML = '<option value="">-</option>';
+      if(roundSel) roundSel.value = getRounds()[0] || '';
+      el('recordDate').value = '';
+      renderHistoryList();
+      renderIndividualReport();
+      renderLoggedInStudent();
+    }
+
+    function logoutStudent(){
+      saveStudentLogin(null);
+      stopQrScanner();
+      resetStudentWorkspace();
+      renderLoggedInStudent();
+      showStatus('児童ログアウトしました。');
+    }
+
+    function totalMediaMinutes(response){
+      return Number(response.media?.smartphone||0)+Number(response.media?.tabletpc||0)+Number(response.media?.game||0)+Number(response.media?.tv||0);
+    }
+
+    function totalOkCount(response){
+      return (response.reflection||[]).flat().filter(x=>x==='○').length;
+    }
+
+    function getTimelineMinutes(response, category){
+      const keys = category === 'free' ? ['free','free2'] : [category];
+      return (Array.isArray(response.timeline) ? response.timeline : []).filter(x=>keys.includes(x)).length * 30;
+    }
+
+    function sortResponsesChronologically(arr){
+      return arr.slice().sort((a,b)=> {
+        const ad = String(a.recordDate || '');
+        const bd = String(b.recordDate || '');
+        if(ad !== bd) return ad.localeCompare(bd);
+        return String(a.savedAt || '').localeCompare(String(b.savedAt || ''));
+      });
+    }
+
+
+    function renderSchoolSelectors(){
+      const schools = getSchools();
+      const schoolSel = el('schoolSelect');
+      const addSchoolSel = el('addSchool');
+      const currentSchool = schoolSel.value;
+      const currentAddSchool = addSchoolSel.value;
+      const options = schools.filter(Boolean).map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+      schoolSel.innerHTML = options || '<option value="">学校未設定</option>';
+      addSchoolSel.innerHTML = options || '<option value="">学校未設定</option>';
+      if(currentSchool && schools.includes(currentSchool)) schoolSel.value = currentSchool;
+      if(currentAddSchool && schools.includes(currentAddSchool)) addSchoolSel.value = currentAddSchool;
+      if(!schoolSel.value && schools[0] !== undefined) schoolSel.value = schools[0];
+      if(!addSchoolSel.value && schools[0] !== undefined) addSchoolSel.value = schools[0];
+    }
+
+    function syncRecordDateToRound(){
+      const round = el('sessionRoundSelect')?.value || '';
+      const date = getRoundDate(round) || '';
+      if(el('recordDate')) el('recordDate').value = date;
+      renderLoggedInStudent();
+    }
+
+    function renderRoundSelector(){
+      const sel = el('sessionRoundSelect');
+      const rounds = getRounds();
+      const current = sel.value;
+      sel.innerHTML = rounds.map(r=>`<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+      if(current && rounds.includes(current)) sel.value = current;
+      if(!sel.value && rounds[0]) sel.value = rounds[0];
+      sel.onchange = ()=> {
+        syncRecordDateToRound();
+        if(currentStudentLogin){
+          currentStudentLogin.sessionRound = sel.value;
+          saveStudentLogin(currentStudentLogin);
+        }
+        renderHistoryList();
+        renderIndividualReport();
+      };
+      syncRecordDateToRound();
+    }
+
+    function drawTrendChart(canvasId, labels, values, options={}){
+      const canvas = el(canvasId);
+      if(!canvas) return;
+      const parentWidth = Math.max(canvas.parentElement?.clientWidth || 600, 280);
+      const height = Number(canvas.getAttribute('height')) || 220;
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      canvas.width = Math.round(parentWidth * ratio);
+      canvas.height = Math.round(height * ratio);
+      canvas.style.width = parentWidth + 'px';
+      canvas.style.height = height + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(ratio,0,0,ratio,0,0);
+      ctx.clearRect(0,0,parentWidth,height);
+
+      const rotateLabels = options.rotateLabels ?? (labels.length > 5);
+      const labelFont = options.labelFont || '11px sans-serif';
+      const pad = {l:56,r:20,t:18,b:rotateLabels ? 56 : 54};
+      const w = Math.max(parentWidth - pad.l - pad.r, 10);
+      const h = Math.max(height - pad.t - pad.b, 10);
+
+      const normalizeLabel = (lab)=> String(lab ?? '').replace(/\s*\n\s*/g, '\n').replace(/　/g, ' ').trim();
+      const labelLines = labels.map(lab => {
+        const txt = normalizeLabel(lab);
+        if(!txt) return [''];
+        if(txt.includes('\n')) return txt.split('\n').slice(0,2);
+        if(txt.length > 14 && txt.includes(' ')){
+          const parts = txt.split(' ');
+          return [parts.slice(0,-1).join(' '), parts.slice(-1).join(' ')].filter(Boolean).slice(0,2);
+        }
+        return [txt];
+      });
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,parentWidth,height);
+
+      if(!labels.length){
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0,0,parentWidth,height);
+        ctx.strokeStyle = '#e8eff7';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([6,6]);
+        ctx.strokeRect(14,14,parentWidth-28,height-28);
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#64748b';
+        ctx.font = '700 15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(options.emptyText || '記録がありません。', parentWidth/2, height/2 + 4);
+        ctx.textAlign = 'start';
+        return;
+      }
+
+      const max = Math.max(...values, 60);
+      const yMax = Math.ceil(max / 30) * 30;
+      ctx.strokeStyle = '#e5edf7';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '12px sans-serif';
+      for(let i=0;i<=4;i++){
+        const y = pad.t + h - (h * i / 4);
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(parentWidth-pad.r, y); ctx.stroke();
+        const val = Math.round(yMax * i / 4);
+        ctx.fillText(minutesToText(val), 4, y+4);
+      }
+
+      const xStep = labels.length === 1 ? 0 : w / (labels.length - 1);
+      ctx.strokeStyle = '#68a7ff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      labels.forEach((lab,i)=>{
+        const x = pad.l + (labels.length===1 ? w/2 : xStep*i);
+        const y = pad.t + h - (values[i] / yMax) * h;
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+
+      labels.forEach((lab,i)=>{
+        const x = pad.l + (labels.length===1 ? w/2 : xStep*i);
+        const y = pad.t + h - (values[i] / yMax) * h;
+        ctx.fillStyle = '#ff7aa2';
+        ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#334155';
+        ctx.font = labelFont;
+        const lines = labelLines[i];
+        if(rotateLabels){
+          ctx.save();
+          ctx.textAlign = 'right';
+          ctx.translate(x, height - 8);
+          ctx.rotate(-0.45);
+          lines.forEach((line, lineIndex)=> ctx.fillText(String(line).slice(0,16), 0, lineIndex * 12));
+          ctx.restore();
+        }else{
+          ctx.textAlign = 'center';
+          lines.forEach((line, lineIndex)=> ctx.fillText(String(line).slice(0,18), x, height - 20 + lineIndex * 12));
+          ctx.textAlign = 'start';
+        }
+      });
+    }
+
+
+    function setAdminTab(tabName){
+      document.querySelectorAll('.admin-tab-btn').forEach(btn=>{
+        btn.classList.toggle('active', btn.dataset.adminTab === tabName);
+      });
+      document.querySelectorAll('.admin-tab-pane').forEach(pane=>{
+        pane.classList.toggle('active', pane.dataset.adminPane === tabName);
+      });
+      sessionStorage.setItem('media_app_admin_tab', tabName);
+    }
+
+    function setupAdminTabs(){
+      const savedTab = sessionStorage.getItem('media_app_admin_tab') || 'basic';
+      document.querySelectorAll('.admin-tab-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=> setAdminTab(btn.dataset.adminTab));
+      });
+      setAdminTab(savedTab);
+    }
+
+    function setAdminVisibility(isUnlocked){
+      const layout = document.querySelector('.layout');
+      const adminPanel = el('adminPanel');
+      const loginBtn = el('adminLoginBtn');
+      const logoutBtn = el('adminLogoutBtn');
+      const loginBox = el('adminLoginBox');
+      if(isUnlocked){
+        layout.classList.remove('admin-hidden');
+        layout.classList.add('admin-open');
+        adminPanel.classList.remove('hide');
+        loginBtn.classList.add('hide');
+        logoutBtn.classList.remove('hide');
+        loginBox.classList.add('hide');
+      } else {
+        layout.classList.add('admin-hidden');
+        layout.classList.remove('admin-open');
+        adminPanel.classList.add('hide');
+        loginBtn.classList.remove('hide');
+        logoutBtn.classList.add('hide');
+      }
+    }
+
+    function setupAdminMode(){
+      const unlocked = sessionStorage.getItem(ADMIN_SESSION_KEY) === '1';
+      setAdminVisibility(unlocked);
+      if(!unlocked){
+        const box = el('adminLoginBox');
+        if(box) box.classList.add('hide');
+      }
+    }
+
+    function openAdminLoginBox(){
+      const box = el('adminLoginBox');
+      if(!box) return;
+      box.classList.remove('hide');
+      const input = el('adminPasswordInput');
+      input.value = '';
+      setTimeout(()=> input.focus(), 0);
+    }
+
+    function closeAdminLoginBox(){
+      const box = el('adminLoginBox');
+      if(box) box.classList.add('hide');
+      const input = el('adminPasswordInput');
+      if(input) input.value = '';
+    }
+
+    function loginAdmin(){
+      const input = el('adminPasswordInput');
+      const pw = input ? input.value : '';
+      if(pw === 'admin'){
+        sessionStorage.setItem(ADMIN_SESSION_KEY, '1');
+        setAdminVisibility(true);
+        closeAdminLoginBox();
+        showStatus('管理者としてログインしました。');
+      } else {
+        alert('パスワードが違います。');
+        if(input) input.focus();
+      }
+    }
+
+    function logoutAdmin(){
+      sessionStorage.removeItem(ADMIN_SESSION_KEY);
+      setAdminVisibility(false);
+      closeAdminLoginBox();
+      showStatus('ログアウトしました。');
+    }
+
+
+    function createDeleteButton(handler){
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'danger';
+      btn.textContent = '削除';
+      btn.addEventListener('click', handler);
+      return btn;
+    }
+
+    function renderSchoolNamesEditor(values = []){
+      const wrap = el('schoolNamesEditor');
+      if(!wrap) return;
+      const list = values.length ? values : [''];
+      wrap.innerHTML = '';
+      list.forEach((value, idx)=>{
+        const row = document.createElement('div');
+        row.className = 'editor-row';
+        row.innerHTML = `<input type="text" class="school-setting-input" placeholder="学校名を入力" value="${escapeHtml(value || '')}">`;
+        if(list.length > 1){
+          row.appendChild(createDeleteButton(()=>{
+            const next = getEditorValues('#schoolNamesEditor .school-setting-input');
+            next.splice(idx,1);
+            renderSchoolNamesEditor(next);
+          }));
+        }else{
+        }
+        if(list.length <= 1){
+          const hidden = document.createElement('div');
+          hidden.style.display='none';
+          row.appendChild(hidden);
+        }
+        wrap.appendChild(row);
+      });
+    }
+
+    function collectRoundSettings(){
+      return [...document.querySelectorAll('#roundsEditor .round-date-row')].map(row => ({
+        name: row.querySelector('.round-setting-input')?.value.trim() || '',
+        date: row.querySelector('.round-date-input')?.value || ''
+      })).filter(item => item.name || item.date);
+    }
+
+    function renderRoundsEditor(values = []){
+      const wrap = el('roundsEditor');
+      if(!wrap) return;
+      const s = getSettings();
+      let list = [];
+      if(values.length && typeof values[0] === 'object'){
+        list = values;
+      }else if(values.length){
+        list = values.map(v=>({name:v,date:(s.roundDateMap||{})[v]||''}));
+      }else{
+        list = (s.rounds || ['第1回']).map(v=>({name:v,date:(s.roundDateMap||{})[v]||''}));
+      }
+      wrap.innerHTML = '';
+      list.forEach((item, idx)=>{
+        const row = document.createElement('div');
+        row.className = 'round-date-row';
+        row.innerHTML = `
+          <input type="text" class="round-setting-input" placeholder="例：第1回（5月）" value="${escapeHtml(item.name || '')}">
+          <input type="date" class="round-date-input" value="${escapeHtml(item.date || '')}">
+        `;
+        if(list.length > 1){
+          row.appendChild(createDeleteButton(()=>{
+            const next = collectRoundSettings();
+            next.splice(idx,1);
+            renderRoundsEditor(next);
+          }));
+        }else{
+          const hidden = document.createElement('div');
+          hidden.style.display='none';
+          row.appendChild(hidden);
+        }
+        wrap.appendChild(row);
+      });
+    }
+
+    function renderTimelineCategoriesEditor(values = []){
+      const wrap = el('timelineCategoriesEditor');
+      if(!wrap) return;
+      const list = values.length ? values : structuredClone(DEFAULT_SETTINGS.timelineCategories);
+      wrap.innerHTML = '';
+      list.forEach((item, idx)=>{
+        const row = document.createElement('div');
+        row.className = 'editor-row multi-3';
+        row.innerHTML = `
+          <input type="text" class="timeline-key-input" placeholder="キー（例：sleep）" value="${escapeHtml(item.key || '')}">
+          <input type="text" class="timeline-label-input" placeholder="表示名（例：すいみん）" value="${escapeHtml(item.label || '')}">
+          <input type="color" class="timeline-color-input" value="${escapeHtml(item.color || '#a6b7cc')}">
+        `;
+        row.appendChild(createDeleteButton(()=>{
+          const next = collectTimelineCategoriesEditor();
+          next.splice(idx,1);
+          renderTimelineCategoriesEditor(next);
+        }));
+        wrap.appendChild(row);
+      });
+      if(!list.length){
+        wrap.innerHTML = '<div class="editor-empty">項目がありません。「＋ 項目を追加」から追加してください。</div>';
+      }
+    }
+
+    function renderMediaOptionsEditor(values = []){
+      const wrap = el('mediaOptionsEditor');
+      if(!wrap) return;
+      const list = values.length ? values : structuredClone(DEFAULT_SETTINGS.mediaOptions);
+      wrap.innerHTML = '';
+      list.forEach((item, idx)=>{
+        const row = document.createElement('div');
+        row.className = 'editor-row multi-2';
+        row.innerHTML = `
+          <input type="text" class="media-label-input" placeholder="表示名（例：1時間30分）" value="${escapeHtml(item.label || '')}">
+          <input type="number" class="media-value-input" min="0" step="10" placeholder="分" value="${Number(item.value || 0)}">
+        `;
+        row.appendChild(createDeleteButton(()=>{
+          const next = collectMediaOptionsEditor();
+          next.splice(idx,1);
+          renderMediaOptionsEditor(next);
+        }));
+        wrap.appendChild(row);
+      });
+    }
+
+    function renderQuestionsEditor(values = []){
+      const wrap = el('questionsEditor');
+      if(!wrap) return;
+      const list = values.length ? values : structuredClone(DEFAULT_SETTINGS.reflectionQuestions);
+      wrap.innerHTML = '';
+      list.forEach((value, idx)=>{
+        const row = document.createElement('div');
+        row.className = 'editor-row';
+        row.innerHTML = `<input type="text" class="question-setting-input" placeholder="設問を入力" value="${escapeHtml(value || '')}">`;
+        row.appendChild(createDeleteButton(()=>{
+          const next = getEditorValues('#questionsEditor .question-setting-input');
+          next.splice(idx,1);
+          renderQuestionsEditor(next);
+        }));
+        wrap.appendChild(row);
+      });
+    }
+
+    function getEditorValues(selector){
+      return [...document.querySelectorAll(selector)].map(input => input.value.trim()).filter(Boolean);
+    }
+
+    function collectTimelineCategoriesEditor(){
+      return [...document.querySelectorAll('#timelineCategoriesEditor .editor-row')].map(row => ({
+        key: row.querySelector('.timeline-key-input')?.value.trim() || '',
+        label: row.querySelector('.timeline-label-input')?.value.trim() || '',
+        color: row.querySelector('.timeline-color-input')?.value || '#a6b7cc'
+      })).filter(item => item.key || item.label);
+    }
+
+    function collectMediaOptionsEditor(){
+      return [...document.querySelectorAll('#mediaOptionsEditor .editor-row')].map(row => ({
+        label: row.querySelector('.media-label-input')?.value.trim() || '',
+        value: Number(row.querySelector('.media-value-input')?.value || 0)
+      })).filter(item => item.label);
+    }
+
+    function applySettingsToForm(){
+      const s = getSettings();
+      if(!el('projectTitle').value) el('projectTitle').value = s.projectTitle || '';
+      if(!el('recordDate').value) el('recordDate').value = getRoundDate(el('sessionRoundSelect')?.value || s.rounds?.[0] || '') || s.projectDate || new Date().toISOString().slice(0,10);
+      if(el('publicBaseUrl')) el('publicBaseUrl').value = s.publicBaseUrl || '';
+
+      el('projectTitleSetting').value = s.projectTitle || '';
+            el('section1TitleSetting').value = s.section1Title || '';
+      el('section1HelpSetting').value = s.section1Help || '';
+      el('section2TitleSetting').value = s.section2Title || '';
+      el('section2HelpSetting').value = s.section2Help || '';
+      el('section3TitleSetting').value = s.section3Title || '';
+      el('section3HelpSetting').value = s.section3Help || '';
+      el('section4TitleSetting').value = s.section4Title || '';
+      el('section4HelpSetting').value = s.section4Help || '';
+
+      renderSchoolNamesEditor(s.schools || []);
+      renderRoundsEditor((s.rounds || []).map(name=>({name, date:(s.roundDateMap||{})[name] || ''})));
+      renderTimelineCategoriesEditor(s.timelineCategories || []);
+      renderMediaOptionsEditor(s.mediaOptions || []);
+      renderQuestionsEditor(s.reflectionQuestions || []);
+
+      el('section1Title').textContent = s.section1Title || '';
+      el('section1Help').textContent = s.section1Help || '';
+      el('section2Title').textContent = s.section2Title || '';
+      el('section2Help').textContent = s.section2Help || '';
+      el('section3Title').textContent = s.section3Title || '';
+      el('section3Help').textContent = s.section3Help || '';
+      el('section4Title').textContent = s.section4Title || '';
+      el('section4Help').textContent = s.section4Help || '';
+
+      renderRoundSelector();
+      renderCategoryPicker();
+      populateMediaSelects();
+      renderReflectionTable();
+      renderSummaryTable();
+    }
+
+    function renderStudentSelectors(){
+      renderSchoolSelectors();
+      const selectedSchool = el('schoolSelect').value;
+      const students = getStudents()
+        .filter(s => String(s.school || '') === String(selectedSchool || ''))
+        .sort((a,b)=> String(a.school||'').localeCompare(String(b.school||''),'ja') || Number(a.grade)-Number(b.grade) || String(a.class).localeCompare(String(b.class),'ja') || String(a.name).localeCompare(String(b.name),'ja'));
+      const gradeSel = el('gradeSelect');
+      const classSel = el('classSelect');
+      const studentSel = el('studentSelect');
+
+      const grades = [...new Set(students.map(s=> String(s.grade)))];
+      const currentGrade = gradeSel.value;
+      gradeSel.innerHTML = grades.length ? grades.map(g=>`<option value="${g}">${g}年</option>`).join('') : '<option value="">名簿未登録</option>';
+      if(currentGrade && grades.includes(currentGrade)) gradeSel.value = currentGrade;
+      const selectedGrade = gradeSel.value || grades[0] || '';
+      const classes = [...new Set(students.filter(s=>String(s.grade)===selectedGrade).map(s=> String(s.class)))];
+      const currentClass = classSel.value;
+      classSel.innerHTML = classes.length ? classes.map(c=>`<option value="${c}">${c}組</option>`).join('') : '<option value="">-</option>';
+      if(currentClass && classes.includes(currentClass)) classSel.value = currentClass;
+      const selectedClass = classSel.value || classes[0] || '';
+      const filtered = students.filter(s=>String(s.grade)===selectedGrade && String(s.class)===selectedClass);
+      const currentStudent = studentSel.value;
+      studentSel.innerHTML = filtered.length ? filtered.map(s=>`<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('') : '<option value="">-</option>';
+      if(currentStudent && filtered.some(s=>String(s.name)===String(currentStudent))) studentSel.value = currentStudent;
+
+      gradeSel.onchange = ()=> {
+        const grade = gradeSel.value;
+        const classes2 = [...new Set(getStudents().filter(s=>String(s.school||'')===String(el('schoolSelect').value||'') && String(s.grade)===grade).map(s=> String(s.class)))];
+        classSel.innerHTML = classes2.length ? classes2.map(c=>`<option value="${c}">${c}組</option>`).join('') : '<option value="">-</option>';
+        classSel.dispatchEvent(new Event('change'));
+      };
+      classSel.onchange = ()=> {
+        const filtered2 = getStudents().filter(s=>String(s.school||'')===String(el('schoolSelect').value||'') && String(s.grade)===gradeSel.value && String(s.class)===classSel.value);
+        studentSel.innerHTML = filtered2.length ? filtered2.map(s=>`<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('') : '<option value="">-</option>';
+        studentSel.dispatchEvent(new Event('change'));
+      };
+      studentSel.onchange = ()=> renderHistoryList();
+      renderHistoryList();
+      renderIndividualReport();
+    }
+
+    function renderStudentList(){
+      const list = el('studentList');
+      const students = getStudents();
+      if(!students.length){ list.innerHTML = '<div class="student-row">名簿はまだありません。</div>'; return; }
+      list.innerHTML = students.map((s, i)=>`<div class="student-row"><span>${escapeHtml(s.school || '学校未設定')}｜${escapeHtml(s.grade)}年 ${escapeHtml(s.class)}組 ${escapeHtml(s.name)}</span><button type="button" class="ghost removeStudentBtn" data-i="${i}">削除</button></div>`).join('');
+      list.querySelectorAll('.removeStudentBtn').forEach(btn=> btn.addEventListener('click', ()=>{
+        const arr = getStudents(); arr.splice(Number(btn.dataset.i),1); saveJson(STUDENTS_KEY, arr); renderStudentList(); renderStudentSelectors(); renderAdminFilters(); renderQrAdminFilters(); renderQrCardsPreview(); showStatus('児童を削除しました。');
+      }));
+    }
+
+    function getAdminSelectedSchool(){
+      const sel = el('adminSchoolFilter');
+      return sel ? sel.value : '';
+    }
+
+    function getAdminSelectedRound(){
+      const sel = el('adminRoundFilter');
+      return sel ? sel.value : '';
+    }
+
+    function renderAdminFilters(){
+      const schoolSel = el('adminSchoolFilter');
+      const roundSel = el('adminRoundFilter');
+      if(!schoolSel || !roundSel) return;
+      const currentSchool = schoolSel.value;
+      const currentRound = roundSel.value;
+      const schools = getSchools().filter(Boolean);
+      schoolSel.innerHTML = '<option value="">全学校</option>' + schools.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+      if(schools.includes(currentSchool)) schoolSel.value = currentSchool;
+      const rounds = getRounds();
+      roundSel.innerHTML = '<option value="">全実施回</option>' + rounds.map(r=>`<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+      if(rounds.includes(currentRound)) roundSel.value = currentRound;
+    }
+
+    function getFilteredResponsesForAdmin(){
+      const school = getAdminSelectedSchool();
+      const round = getAdminSelectedRound();
+      let responses = getResponses().filter(r => (!school || String(r.schoolName||'')===String(school)) && (!round || String(r.sessionRound||'')===String(round)));
+      const mode = el('adminListMode')?.value || 'all';
+      if(mode === 'latest'){
+        const map = new Map();
+        responses.forEach(r=>{
+          const key = `${r.schoolName||''}__${r.grade||''}__${r.className||''}__${r.studentName||''}`;
+          const prev = map.get(key);
+          if(!prev || new Date(r.savedAt||0) > new Date(prev.savedAt||0)) map.set(key, r);
+        });
+        responses = [...map.values()];
+      }
+      return sortResponsesChronologically(responses);
+    }
+
+
+    function setHistoryKpis(meta={}){
+      const count = el('historyKpiCount');
+      const latest = el('historyKpiLatestMedia');
+      const best = el('historyKpiBestOk');
+      if(count) count.textContent = meta.countText || '0回';
+      if(latest) latest.textContent = meta.latestMedia || '-';
+      if(best) best.textContent = meta.bestOk || '-';
+    }
+
+    function toggleHistoryEmpty(isEmpty, message='まだ個人記録がありません。<br>保存すると、ここにグラフが表示されます。'){
+      const empty = el('historyEmptyState');
+      const canvas = el('historyChart');
+      const tableWrap = canvas?.nextElementSibling?.nextElementSibling || document.querySelector('.history-table-wrap');
+      if(empty){
+        empty.innerHTML = message;
+        empty.classList.toggle('hide', !isEmpty);
+      }
+      if(canvas) canvas.classList.toggle('hide', isEmpty);
+      if(tableWrap) tableWrap.classList.toggle('hide', isEmpty);
+    }
+
+    function renderResponseList(){
+      const list = el('responseList');
+      const responses = getFilteredResponsesForAdmin();
+      if(!responses.length){ list.innerHTML = '<div class="student-row">条件に合う回答はまだありません。</div>'; return; }
+      list.innerHTML = responses.slice().reverse().map(r=>`<div class="student-row"><span>${escapeHtml(r.schoolName || '')}｜${escapeHtml(r.recordDate || '')}｜${escapeHtml(r.sessionRound || '')}｜${escapeHtml(r.grade)}年${escapeHtml(r.className)}組 ${escapeHtml(r.studentName)}</span><span>${minutesToText(totalMediaMinutes(r))}</span></div>`).join('');
+    }
+
+    function renderHistoryList(){
+      const box = el('historyList');
+      const summary = el('historySummary');
+      const grade = el('gradeSelect').value;
+      const className = el('classSelect').value;
+      const studentName = el('studentSelect').value;
+      const rows = sortResponsesChronologically(getResponses().filter(r => String(r.schoolName||'')===String(el('schoolSelect').value||'') && String(r.grade)===String(grade) && String(r.className)===String(className) && String(r.studentName)===String(studentName)));
+      const historyTable = el('historyTable');
+      if(!studentName){
+        summary.textContent = currentStudentLogin ? '読み込み中です。' : 'QRログインすると、これまでの記録がここに分かりやすく表示されます。';
+        box.innerHTML = '';
+        historyTable.innerHTML = '';
+        setHistoryKpis({countText:'0回', latestMedia:'-', bestOk:'-'});
+        toggleHistoryEmpty(true, 'まだ個人記録がありません。<br>保存すると、ここにグラフが表示されます。');
+        drawTrendChart('historyChart', [], [], {emptyText:'まだ個人記録がありません。'});
+        return;
+      }
+      summary.textContent = `${studentName} さんの保存済み記録：${rows.length}件`;
+      if(!rows.length){
+        box.innerHTML = '<div class="history-item"><span>まだ過去の記録はありません。</span></div>';
+        historyTable.innerHTML = '<tr><th>実施回</th><th>記入日</th><th>合計時間</th><th>○の数</th><th>すいみん</th></tr><tr><td colspan="5">記録はまだありません。</td></tr>';
+        setHistoryKpis({countText:'0回', latestMedia:'-', bestOk:'-'});
+        toggleHistoryEmpty(true, 'まだ過去の記録はありません。<br>1回目の保存後に、ここへ変化が表示されます。');
+        drawTrendChart('historyChart', [], [], {emptyText:'まだ個人記録がありません。'});
+        return;
+      }
+      const labels = rows.map(r => `${r.sessionRound || '実施回'} ${(r.recordDate || '').slice(5)}`.trim());
+      const values = rows.map(r => totalMediaMinutes(r));
+      const latestRow = rows[rows.length - 1];
+      const bestOk = Math.max(...rows.map(r => totalOkCount(r)), 0);
+      setHistoryKpis({
+        countText: `${rows.length}回`,
+        latestMedia: minutesToText(totalMediaMinutes(latestRow)),
+        bestOk: `${bestOk}こ`
+      });
+      toggleHistoryEmpty(false);
+      drawTrendChart('historyChart', labels, values, {emptyText:'まだ個人記録がありません。', rotateLabels:false, labelFont:'10px sans-serif'});
+      historyTable.innerHTML = '<tr><th>実施回</th><th>記入日</th><th>合計時間</th><th>○の数</th><th>すいみん</th></tr>' + rows.map(r=>`<tr><td>${escapeHtml(r.sessionRound || '')}</td><td>${escapeHtml(r.recordDate || '')}</td><td>${minutesToText(totalMediaMinutes(r))}</td><td>${totalOkCount(r)}</td><td>${minutesToText(getTimelineMinutes(r,'sleep'))}</td></tr>`).join('');
+      box.innerHTML = rows.slice().reverse().map((r,idx)=>{
+        return `<div class="history-item"><div><strong>${escapeHtml(r.sessionRound || '実施回')}</strong><div class="tiny">${escapeHtml(r.recordDate || '日付なし')}｜メディア合計 ${minutesToText(totalMediaMinutes(r))}｜○ ${totalOkCount(r)}個</div></div><button type="button" class="secondary loadHistoryBtn" data-i="${rows.length-1-idx}">この記録を見る</button></div>`;
+      }).join('');
+      box.querySelectorAll('.loadHistoryBtn').forEach(btn=>btn.addEventListener('click', ()=>{
+        const data = rows[Number(btn.dataset.i)];
+        loadedHistoryPayload = data;
+        restorePayload(data);
+        showStatus('過去の記録を読み込みました。');
+      }));
+    }
+
+
+    function renderAdminOverview(){
+      const responses = getFilteredResponsesForAdmin();
+      const uniqueStudents = new Set(responses.map(r => `${r.schoolName||''}__${r.grade||''}__${r.className||''}__${r.studentName||''}`));
+      const schools = new Set((responses.length ? responses : getResponses()).map(r => String(r.schoolName||'')).filter(Boolean));
+      const avgMedia = responses.length ? Math.round(responses.reduce((sum,r)=>sum+totalMediaMinutes(r),0) / responses.length) : 0;
+      const latest = responses.length ? responses[responses.length - 1] : null;
+
+      const setText = (id, value) => { const node = el(id); if(node) node.textContent = value; };
+      setText('adminKpiResponses', `${responses.length}件`);
+      setText('adminKpiStudents', `${uniqueStudents.size}人`);
+      setText('adminKpiAverage', responses.length ? minutesToText(avgMedia) : '0分');
+      setText('adminKpiSchools', `${Math.max(getSchools().filter(Boolean).length, schools.size)}校`);
+      setText('adminKpiResponsesSub', latest ? `直近保存：${latest.recordDate || '日付なし'} ${latest.studentName || ''}` : 'まだ回答がありません。');
+      setText('adminKpiStudentsSub', responses.length ? '同一児童の複数回答も一覧で確認できます。' : 'QRログイン後に集計されます。');
+      setText('adminKpiAverageSub', responses.length ? `合計 ${responses.reduce((sum,r)=>sum+totalMediaMinutes(r),0)}分 から計算` : 'しぼり込み条件に合わせて表示します。');
+      setText('adminKpiSchoolsSub', `登録済み ${getSchools().filter(Boolean).length}校`);
+
+      const dash = el('adminDashboardList');
+      if(!dash) return;
+      if(!responses.length){
+        dash.innerHTML = '<div class="empty-card">まだ回答がありません。<br>児童が保存すると、ここに提出状況や最近の動きが表示されます。</div>';
+        return;
+      }
+
+      const latestThree = responses.slice().reverse().slice(0,3);
+      const byRound = new Map();
+      responses.forEach(r=>{
+        const key = r.sessionRound || '実施回未設定';
+        if(!byRound.has(key)) byRound.set(key, []);
+        byRound.get(key).push(r);
+      });
+      const bestRound = [...byRound.entries()].map(([round, items])=>({
+        round,
+        avg: Math.round(items.reduce((sum,r)=>sum+totalMediaMinutes(r),0)/items.length),
+        count: items.length
+      })).sort((a,b)=>a.avg-b.avg)[0];
+
+      dash.innerHTML = latestThree.map(r => `
+        <div class="dashboard-item">
+          <div>
+            <strong>${escapeHtml(r.studentName || '名前未設定')}</strong>
+            <div class="meta">${escapeHtml(r.schoolName || '')} / ${escapeHtml(String(r.grade || ''))}年${escapeHtml(String(r.className || ''))}組 / ${escapeHtml(r.sessionRound || '')}<br>保存日 ${escapeHtml(r.recordDate || '')} ・ ○ ${totalOkCount(r)}こ</div>
+          </div>
+          <span class="dashboard-tag">${minutesToText(totalMediaMinutes(r))}</span>
+        </div>
+      `).join('') + (bestRound ? `
+        <div class="dashboard-item">
+          <div>
+            <strong>平均メディア時間が少ない実施回</strong>
+            <div class="meta">${escapeHtml(bestRound.round)} は ${bestRound.count}件で平均 ${minutesToText(bestRound.avg)} でした。</div>
+          </div>
+          <span class="dashboard-tag">参考</span>
+        </div>
+      ` : '');
+    }
+
+    function renderAdminTrend(){
+      const selectedSchool = getAdminSelectedSchool();
+      const selectedRound = getAdminSelectedRound();
+      const responses = getResponses().filter(r => (!selectedSchool || String(r.schoolName||'')===String(selectedSchool)) && (!selectedRound || String(r.sessionRound||'')===String(selectedRound)));
+      const rounds = getRounds();
+      const grouped = rounds.map(round=>{
+        const items = responses.filter(r => String(r.sessionRound || '') === String(round));
+        const avg = items.length ? Math.round(items.reduce((sum,r)=>sum+totalMediaMinutes(r),0) / items.length) : 0;
+        return {round, count: items.length, avg};
+      }).filter(x => x.count > 0 || rounds.length === 1);
+      drawTrendChart('adminTrendChart', grouped.map(g=>g.round), grouped.map(g=>g.avg), {emptyText:'まだ全体集計がありません。'});
+      const table = el('adminTrendTable');
+      if(!grouped.length){
+        table.innerHTML = '<tr><th>実施回</th><th>回答人数</th><th>平均メディア時間</th></tr><tr><td colspan="3">まだ回答がありません。</td></tr>';
+        return;
+      }
+      table.innerHTML = '<tr><th>実施回</th><th>回答人数</th><th>平均メディア時間</th></tr>' + grouped.map(g=>`<tr><td>${escapeHtml(g.round)}</td><td>${g.count}人</td><td>${minutesToText(g.avg)}</td></tr>`).join('');
+    }
+
+
+    function renderAggregateFilters(){
+      const selectedSchool = getAdminSelectedSchool();
+      const selectedRound = getAdminSelectedRound();
+      const responses = getResponses().filter(r => (!selectedSchool || String(r.schoolName||'')===String(selectedSchool)) && (!selectedRound || String(r.sessionRound||'')===String(selectedRound)));
+      const gradeSel = el('aggregateGradeFilter');
+      const classSel = el('aggregateClassFilter');
+      const grades = [...new Set(responses.map(r=>String(r.grade)).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));
+      const currentGrade = gradeSel?.value || '';
+      gradeSel.innerHTML = '<option value="">全学年</option>' + grades.map(g=>`<option value="${g}">${g}年</option>`).join('');
+      if(grades.includes(currentGrade)) gradeSel.value = currentGrade;
+      const source = responses.filter(r => !gradeSel.value || String(r.grade) === String(gradeSel.value));
+      const classes = [...new Set(source.map(r=>String(r.className)).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'ja'));
+      const currentClass = classSel?.value || '';
+      classSel.innerHTML = '<option value="">全組</option>' + classes.map(c=>`<option value="${c}">${c}組</option>`).join('');
+      if(classes.includes(currentClass)) classSel.value = currentClass;
+    }
+
+    function renderAggregateSummary(){
+      const selectedSchool = getAdminSelectedSchool();
+      const selectedRound = getAdminSelectedRound();
+      const responses = getResponses().filter(r => (!selectedSchool || String(r.schoolName||'')===String(selectedSchool)) && (!selectedRound || String(r.sessionRound||'')===String(selectedRound)));
+      renderAggregateFilters();
+      const grade = el('aggregateGradeFilter').value;
+      const className = el('aggregateClassFilter').value;
+      const mode = el('aggregateMode').value;
+      const filtered = responses.filter(r => (!grade || String(r.grade)===String(grade)) && (!className || String(r.className)===String(className)));
+      const table = el('aggregateTable');
+      if(!filtered.length){
+        drawTrendChart('aggregateChart', [], [], {emptyText:'条件に合う記録がありません。'});
+        table.innerHTML = '<tr><th>区分</th><th>回答人数</th><th>平均メディア時間</th><th>平均○の数</th></tr><tr><td colspan="4">条件に合う記録がありません。</td></tr>';
+        return;
+      }
+      let groupedMap = new Map();
+      if(mode === 'school'){
+        filtered.forEach(r=>{
+          const key = r.schoolName || '学校未設定';
+          if(!groupedMap.has(key)) groupedMap.set(key, []);
+          groupedMap.get(key).push(r);
+        });
+      } else if(mode === 'class'){
+        filtered.forEach(r=>{
+          const key = `${r.grade}年${r.className}組`;
+          if(!groupedMap.has(key)) groupedMap.set(key, []);
+          groupedMap.get(key).push(r);
+        });
+      } else {
+        const rounds = getRounds();
+        filtered.forEach(r=>{
+          const key = r.sessionRound || '実施回未設定';
+          if(!groupedMap.has(key)) groupedMap.set(key, []);
+          groupedMap.get(key).push(r);
+        });
+      }
+      if(mode !== 'class'){
+        const original = groupedMap;
+        groupedMap = new Map();
+        const rounds = getRounds();
+        rounds.forEach(round=>{ if(original.has(round)) groupedMap.set(round, original.get(round)); });
+        original.forEach((v,k)=>{ if(!groupedMap.has(k)) groupedMap.set(k,v); });
+      }
+      const grouped = [...groupedMap.entries()].map(([label, items])=>({
+        label,
+        count: items.length,
+        avgMedia: Math.round(items.reduce((sum,r)=>sum+totalMediaMinutes(r),0)/items.length),
+        avgOk: Math.round((items.reduce((sum,r)=>sum+totalOkCount(r),0)/items.length)*10)/10
+      }));
+      drawTrendChart('aggregateChart', grouped.map(g=>g.label), grouped.map(g=>g.avgMedia), {emptyText:'条件に合う記録がありません。'});
+      table.innerHTML = '<tr><th>区分</th><th>回答人数</th><th>平均メディア時間</th><th>平均○の数</th></tr>' + grouped.map(g=>`<tr><td>${escapeHtml(g.label)}</td><td>${g.count}人</td><td>${minutesToText(g.avgMedia)}</td><td>${g.avgOk}</td></tr>`).join('');
+    }
+
+    function renderIndividualReport(){
+      const payload = buildPayload();
+      const rows = sortResponsesChronologically(getResponses().filter(r => String(r.schoolName||'')===String(payload.schoolName||'') && String(r.grade)===String(payload.grade) && String(r.className)===String(payload.className) && String(r.studentName)===String(payload.studentName)));
+      const currentOk = totalOkCount(payload);
+      const sleep = getTimelineMinutes(payload,'sleep');
+      const free = getTimelineMinutes(payload,'free');
+      const noMedia = getTimelineMinutes(payload,'nomedia');
+      const mediaTotal = totalMediaMinutes(payload);
+
+      const printableName = payload.studentName ? `${payload.grade || ''}年 ${payload.className || ''}組 ${payload.studentName}`.trim() : '未ログイン';
+      el('individualReportName').textContent = printableName;
+      el('individualReportMeta').innerHTML = `学校名：${escapeHtml(payload.schoolName || '未設定')}<br>取組名：${escapeHtml(payload.projectTitle || '')}`;
+      el('metricMediaTotal').textContent = minutesToText(mediaTotal);
+      el('metricOkTotal').textContent = `${currentOk}こ`;
+      el('metricSleep').textContent = minutesToText(sleep);
+      el('metricFree').textContent = minutesToText(free);
+      el('metricNoMedia').textContent = minutesToText(noMedia);
+      el('reportRoundMeta').textContent = `実施回：${payload.sessionRound || '未設定'}`;
+      el('reportDateMeta').textContent = `記入日：${payload.recordDate || '未設定'}`;
+      el('individualReportCurrent').innerHTML = `<strong>じぶんのふりかえり</strong><br>${escapeHtml(payload.studentNote || 'まだ入力されていません。')}`;
+      el('individualReportGuardian').innerHTML = `<strong>おうちの人・先生のメモ</strong><br>${escapeHtml(payload.guardianNote || 'まだ記入されていません。')}`;
+
+      if(!rows.length){
+        drawTrendChart('individualTrendChart', [], [], {emptyText:'保存済み記録がありません。'});
+        el('individualReportHistory').textContent = 'まだ保存済み記録がありません。今回の記録を保存すると、次からグラフで見られます。';
+        el('individualReportTable').innerHTML = '<tr><th>実施回</th><th>日付</th><th>合計時間</th><th>○の数</th></tr><tr><td colspan="4">保存済み記録はまだありません。</td></tr>';
+        return;
+      }
+      drawTrendChart('individualTrendChart', rows.map(r=>r.sessionRound || '実施回'), rows.map(r=>totalMediaMinutes(r)), {emptyText:'保存済み記録がありません。'});
+      const latest = rows[rows.length-1];
+      const prev = rows.length >= 2 ? rows[rows.length-2] : null;
+      let comment = `保存済み記録：${rows.length}件 / 直近のメディア合計：${minutesToText(totalMediaMinutes(latest))}`;
+      if(prev){
+        const diff = totalMediaMinutes(latest) - totalMediaMinutes(prev);
+        const sign = diff > 0 ? 'ふえた' : diff < 0 ? 'へった' : 'おなじ';
+        comment += `<br>1つ前とくらべると ${minutesToText(Math.abs(diff))} ${sign}`;
+      }
+      el('individualReportHistory').innerHTML = comment;
+      const recentRows = [...rows].reverse().slice(0,4);
+      el('individualReportTable').innerHTML = '<tr><th>実施回</th><th>日付</th><th>合計時間</th><th>○の数</th></tr>' + recentRows.map(r=>`<tr><td>${escapeHtml(r.sessionRound || '')}</td><td>${escapeHtml(r.recordDate || '')}</td><td>${minutesToText(totalMediaMinutes(r))}</td><td>${totalOkCount(r)}こ</td></tr>`).join('');
+    }
+
+    function printIndividualReport(){
+      renderIndividualReport();
+      document.body.classList.add('print-individual');
+      window.print();
+      setTimeout(()=>document.body.classList.remove('print-individual'), 300);
+    }
+
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('print-individual');
+      document.body.classList.remove('print-handouts');
+    });
+
+    function saveSettings(){
+      const roundSettings = collectRoundSettings();
+      const rounds = roundSettings.map(item=>item.name).filter(Boolean);
+      const roundDateMap = Object.fromEntries(roundSettings.filter(item=>item.name).map(item=>[item.name, item.date || '']));
+      const schools = getEditorValues('#schoolNamesEditor .school-setting-input');
+      const timelineCategories = collectTimelineCategoriesEditor().map((item, i)=>({
+        key: item.key || `item${i+1}`,
+        label: item.label || item.key || `項目${i+1}`,
+        color: item.color || '#a6b7cc'
+      }));
+      const mediaOptions = collectMediaOptionsEditor();
+      const reflectionQuestions = getEditorValues('#questionsEditor .question-setting-input');
+
+      const settings = {
+        schools,
+        schoolName: schools[0] || '',
+        projectTitle: el('projectTitleSetting').value.trim(),
+        projectDate: '',
+        rounds: rounds.length ? rounds : ['第1回'],
+        roundDateMap,
+        section1Title: el('section1TitleSetting').value.trim() || DEFAULT_SETTINGS.section1Title,
+        section1Help: el('section1HelpSetting').value.trim() || DEFAULT_SETTINGS.section1Help,
+        timelineCategories: timelineCategories.length ? timelineCategories : structuredClone(DEFAULT_SETTINGS.timelineCategories),
+        section2Title: el('section2TitleSetting').value.trim() || DEFAULT_SETTINGS.section2Title,
+        section2Help: el('section2HelpSetting').value.trim() || DEFAULT_SETTINGS.section2Help,
+        mediaOptions: mediaOptions.length ? mediaOptions : structuredClone(DEFAULT_SETTINGS.mediaOptions),
+        section3Title: el('section3TitleSetting').value.trim() || DEFAULT_SETTINGS.section3Title,
+        section3Help: el('section3HelpSetting').value.trim() || DEFAULT_SETTINGS.section3Help,
+        reflectionQuestions: reflectionQuestions.length ? reflectionQuestions : structuredClone(DEFAULT_SETTINGS.reflectionQuestions),
+        section4Title: el('section4TitleSetting').value.trim() || DEFAULT_SETTINGS.section4Title,
+        section4Help: el('section4HelpSetting').value.trim() || DEFAULT_SETTINGS.section4Help
+      };
+      saveJson(SETTINGS_KEY, settings);
+
+      const targetLen = settings.reflectionQuestions.length;
+      reflection = Array.from({length: targetLen}, (_, qi)=> {
+        const row = Array.isArray(reflection[qi]) ? reflection[qi].slice(0,5) : [];
+        while(row.length < 5) row.push('');
+        return row;
+      });
+
+      applySettingsToForm();
+      renderStudentSelectors();
+      if(currentStudentLogin){ applyStudentLogin(currentStudentLogin); }
+      renderLoggedInStudent();
+      renderAdminFilters();
+      renderQrAdminFilters();
+      renderResponseList();
+      renderAdminOverview();
+      renderAdminTrend();
+      renderAggregateSummary();
+      renderIndividualReport();
+      showStatus('設定を保存しました。');
+    }
+
+    function addStudent(){
+      const school = el('addSchool').value.trim();
+      const grade = el('addGrade').value.trim();
+      const className = el('addClass').value.trim();
+      const name = el('addName').value.trim();
+      if(!school || !grade || !className || !name){ showStatus('学校名・学年・組・名前を入力してください。'); return; }
+      const students = getStudents();
+      students.push({id: makeStudentId(), school, grade, class:className, name});
+      saveJson(STUDENTS_KEY, students);
+      el('addGrade').value=''; el('addClass').value=''; el('addName').value='';
+      renderStudentList(); renderStudentSelectors(); renderAdminFilters();
+      showStatus('児童を追加しました。');
+    }
+
+    function parseCsv(text){
+      return text.trim().split(/\r?\n/).map(line => {
+        const cols = [];
+        let current = '', inQuotes = false;
+        for(let i=0;i<line.length;i++){
+          const ch = line[i];
+          if(ch === '"'){
+            if(inQuotes && line[i+1] === '"'){ current += '"'; i++; }
+            else inQuotes = !inQuotes;
+          } else if(ch === ',' && !inQuotes){ cols.push(current); current=''; }
+          else current += ch;
+        }
+        cols.push(current);
+        return cols.map(c=>c.trim());
+      });
+    }
+
+    function importStudentsCsv(file){
+      const reader = new FileReader();
+      reader.onload = () => {
+        const rows = parseCsv(String(reader.result || ''));
+        let start = 0;
+        const first = (rows[0] && rows[0][0] || '').toLowerCase();
+        if(first === 'school' || first === 'grade') start = 1;
+        const currentSchool = el('addSchool').value || el('schoolSelect').value || '';
+        const students = [];
+        for(let i=start;i<rows.length;i++){
+          if(rows[i].length >= 4){
+            const [school, grade, className, name] = rows[i];
+            if(school && grade && className && name) students.push({id: makeStudentId(), school, grade, class:className, name});
+          } else {
+            const [grade, className, name] = rows[i];
+            if(currentSchool && grade && className && name) students.push({school:currentSchool, grade, class:className, name});
+          }
+        }
+        saveJson(STUDENTS_KEY, students);
+        renderStudentList(); renderStudentSelectors(); renderAdminFilters();
+        showStatus(`${students.length}人の名簿を読み込みました。`);
+      };
+      reader.readAsText(file, 'utf-8');
+    }
+
+    function toCsvValue(v){
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? '"' + s.replaceAll('"','""') + '"' : s;
+    }
+
+    function downloadCsv(filename, rows){
+      const text = rows.map(r=>r.map(toCsvValue).join(',')).join('\n');
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + text], {type:'text/csv;charset=utf-8;'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      setTimeout(()=> URL.revokeObjectURL(a.href), 1000);
+    }
+
+    function buildPayload(){
+      const media = {};
+      document.querySelectorAll('.mediaSelect').forEach(sel => media[sel.dataset.media] = Number(sel.value || 0));
+      return {
+        schoolName: el('schoolSelect').value.trim(),
+        projectTitle: el('projectTitle').value.trim(),
+        recordDate: el('recordDate').value || getRoundDate(el('sessionRoundSelect').value),
+        sessionRound: el('sessionRoundSelect').value,
+        grade: el('gradeSelect').value,
+        className: el('classSelect').value,
+        studentName: el('studentSelect').value,
+        timeline,
+        media,
+        reflection,
+        studentNote: el('studentNote').value.trim(),
+        guardianNote: el('guardianNote').value.trim(),
+        savedAt: new Date().toISOString()
+      };
+    }
+
+    function restorePayload(data){
+      renderSchoolSelectors();
+      if(data.schoolName) el('schoolSelect').value = data.schoolName;
+      el('projectTitle').value = data.projectTitle || '';
+      el('recordDate').value = data.recordDate || '';
+      renderRoundSelector();
+      if(data.sessionRound) el('sessionRoundSelect').value = data.sessionRound;
+      if(data.grade) el('gradeSelect').value = data.grade;
+      if(data.className){ el('gradeSelect').dispatchEvent(new Event('change')); el('classSelect').value = data.className; }
+      if(data.studentName){ el('classSelect').dispatchEvent(new Event('change')); el('studentSelect').value = data.studentName; }
+      timeline = Array.isArray(data.timeline) && data.timeline.length === 48 ? data.timeline : Array(48).fill('empty');
+      const qs = getReflectionQuestions();
+      reflection = Array.from({length: qs.length}, (_, qi)=> {
+        const row = Array.isArray(data.reflection?.[qi]) ? data.reflection[qi].slice(0,5) : [];
+        while(row.length < 5) row.push('');
+        return row;
+      });
+      renderTimeline(); updateTimelineSummary(); renderReflectionTable(); renderSummaryTable();
+      document.querySelectorAll('.mediaSelect').forEach(sel=> sel.value = String(data.media?.[sel.dataset.media] ?? 0));
+      updateMediaTotal();
+      el('studentNote').value = data.studentNote || '';
+      el('guardianNote').value = data.guardianNote || '';
+      renderHistoryList();
+      renderIndividualReport();
+    }
+
+    async function setupFirebaseIfPossible(){
+      const cfg = getFirebaseConfig();
+      if(!cfg.apiKey || !cfg.projectId || !cfg.appId) return false;
+      try{
+        firebaseApp = initializeApp(cfg, 'mediaControlApp-' + cfg.projectId);
+        firestoreDb = getFirestore(firebaseApp);
+        return true;
+      }catch(err){
+        try{
+          firebaseApp = initializeApp(cfg);
+          firestoreDb = getFirestore(firebaseApp);
+          return true;
+        }catch(_){
+          console.error(err);
+          return false;
+        }
+      }
+    }
+
+    async function saveResponse(){
+      const payload = buildPayload();
+      if(!currentStudentLogin){ showStatus('先にQRコードでログインしてください。'); return; }
+      if(!payload.grade || !payload.className || !payload.studentName){ showStatus('先にQRコードでログインしてください。'); return; }
+      const responses = getResponses();
+      responses.push(payload);
+      saveJson(RESPONSES_KEY, responses);
+      renderResponseList();
+      renderHistoryList();
+      renderAdminOverview();
+      renderAdminTrend();
+      renderAggregateSummary();
+
+      const ready = await setupFirebaseIfPossible();
+      if(ready && firestoreDb){
+        const id = `${payload.recordDate || 'nodate'}_${payload.grade}_${payload.className}_${payload.studentName}_${Date.now()}`;
+        try{
+          await setDoc(doc(firestoreDb, 'mediaControlResponses', id), payload);
+          showStatus('回答を保存しました。端末内とクラウドの両方に保存されています。');
+        }catch(e){
+          console.error(e);
+          showStatus('端末内には保存しました。クラウド保存は失敗しました。');
+        }
+      } else {
+        showStatus('回答を端末内に保存しました。');
+      }
+    }
+
+    function saveFirebaseConfig(){
+      const cfg = {
+        apiKey: el('fb_apiKey').value.trim(),
+        authDomain: el('fb_authDomain').value.trim(),
+        projectId: el('fb_projectId').value.trim(),
+        storageBucket: el('fb_storageBucket').value.trim(),
+        messagingSenderId: el('fb_messagingSenderId').value.trim(),
+        appId: el('fb_appId').value.trim()
+      };
+      saveJson(FIREBASE_KEY, cfg);
+      showStatus('Firebase設定を保存しました。');
+    }
+
+    async function testFirebase(){
+      const ok = await setupFirebaseIfPossible();
+      showStatus(ok ? 'Firebaseに接続できる設定です。' : 'Firebase設定が未入力、または接続できませんでした。');
+    }
+
+    function loadFirebaseInputs(){
+      const cfg = getFirebaseConfig();
+      Object.keys(cfg).forEach(key=>{
+        const node = el('fb_' + key);
+        if(node) node.value = cfg[key] || '';
+      });
+    }
+
+    function exportResponsesCsv(){
+      const responses = getResponses();
+      const rows = [['schoolName','projectTitle','recordDate','sessionRound','grade','className','studentName','smartphone','tabletpc','game','tv','mediaTotalMinutes','studentNote','guardianNote','savedAt']];
+      responses.forEach(r=>{
+        const total = Number(r.media?.smartphone||0)+Number(r.media?.tabletpc||0)+Number(r.media?.game||0)+Number(r.media?.tv||0);
+        rows.push([r.schoolName,r.projectTitle,r.recordDate,r.sessionRound||'',r.grade,r.className,r.studentName,r.media?.smartphone||0,r.media?.tabletpc||0,r.media?.game||0,r.media?.tv||0,total,r.studentNote,r.guardianNote,r.savedAt]);
+      });
+      downloadCsv('media_control_responses.csv', rows);
+    }
+
+    function exportStudentsCsv(){
+      const rows = [['school','grade','class','name'], ...getStudents().map(s=>[s.school||'',s.grade,s.class,s.name])];
+      downloadCsv('students_template.csv', rows);
+    }
+
+    function exportJson(){
+      const payload = buildPayload();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `media_control_${payload.grade || 'x'}-${payload.className || 'x'}_${payload.studentName || 'data'}.json`;
+      a.click();
+      setTimeout(()=> URL.revokeObjectURL(a.href), 1000);
+    }
+
+    function importJson(file){
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        try{ restorePayload(JSON.parse(String(reader.result || '{}'))); showStatus('個人データを読み込みました。'); }
+        catch{ showStatus('JSONの読み込みに失敗しました。'); }
+      };
+      reader.readAsText(file, 'utf-8');
+    }
+
+    function init(){
+      setupAdminMode();
+      setupAdminTabs();
+      updateQrCameraUi();
+      initHourLabels();
+      renderCategoryPicker();
+      renderTimeline();
+      updateTimelineSummary();
+      populateMediaSelects();
+      renderReflectionTable();
+      renderSummaryTable();
+      applySettingsToForm();
+      renderRoundSelector();
+      renderStudentList();
+      renderStudentSelectors();
+      renderAdminFilters();
+      renderQrAdminFilters();
+      renderQrCardsPreview();
+      renderResponseList();
+      renderHistoryList();
+      renderAdminOverview();
+      renderAdminTrend();
+      renderAggregateSummary();
+      renderQrCardsPreview();
+      loadFirebaseInputs();
+      if(!el('recordDate').value) el('recordDate').value = new Date().toISOString().slice(0,10);
+
+      el('adminLoginBtn').addEventListener('click', openAdminLoginBox);
+      el('adminLoginSubmitBtn').addEventListener('click', loginAdmin);
+      el('adminLoginCancelBtn').addEventListener('click', closeAdminLoginBox);
+      el('adminPasswordInput').addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); loginAdmin(); } });
+      el('adminLogoutBtn').addEventListener('click', logoutAdmin);
+      el('startQrScanBtn').addEventListener('click', startQrScanner);
+      el('qrImageBtn').addEventListener('click', ()=> el('qrImageInput').click());
+      el('qrImageInput').addEventListener('change', e=> decodeQrFromImageFile(e.target.files && e.target.files[0]));
+      el('stopQrScanBtn').addEventListener('click', stopQrScanner);
+      el('studentLogoutBtn').addEventListener('click', logoutStudent);
+      el('saveBtn').addEventListener('click', saveResponse);
+      el('sessionRoundSelect').addEventListener('change', renderHistoryList);
+      el('schoolSelect').addEventListener('change', ()=>{ renderStudentSelectors(); renderHistoryList(); renderIndividualReport(); });
+      el('printBtn').addEventListener('click', ()=> window.print());
+      el('printIndividualBtn').addEventListener('click', printIndividualReport);
+      el('addSchoolSettingBtn').addEventListener('click', ()=>{
+        const next = getEditorValues('#schoolNamesEditor .school-setting-input');
+        next.push('');
+        renderSchoolNamesEditor(next);
+      });
+      el('addRoundSettingBtn').addEventListener('click', ()=>{
+        const next = collectRoundSettings();
+        next.push({name:'', date:''});
+        renderRoundsEditor(next);
+      });
+      el('addTimelineCategoryBtn').addEventListener('click', ()=>{
+        const next = collectTimelineCategoriesEditor();
+        next.push({key:'', label:'', color:'#a6b7cc'});
+        renderTimelineCategoriesEditor(next);
+      });
+      el('addMediaOptionBtn').addEventListener('click', ()=>{
+        const next = collectMediaOptionsEditor();
+        next.push({label:'', value:0});
+        renderMediaOptionsEditor(next);
+      });
+      el('addQuestionBtn').addEventListener('click', ()=>{
+        const next = getEditorValues('#questionsEditor .question-setting-input');
+        next.push('');
+        renderQuestionsEditor(next);
+      });
+      el('saveSettingsBtn').addEventListener('click', saveSettings);
+      el('saveSettingsBtn2').addEventListener('click', saveSettings);
+      ['adminSchoolFilter','adminRoundFilter','adminListMode'].forEach(id=> el(id).addEventListener('change', ()=>{ renderResponseList(); renderAdminOverview(); renderAdminTrend(); renderAggregateSummary(); }));
+      el('addStudentBtn').addEventListener('click', addStudent);
+      el('clearStudentsBtn').addEventListener('click', ()=>{
+        if(confirm('名簿をすべて削除します。よろしいですか。')){ saveJson(STUDENTS_KEY, []); renderStudentList(); renderStudentSelectors(); renderQrAdminFilters(); renderQrCardsPreview(); showStatus('名簿を削除しました。'); }
+      });
+      el('downloadStudentsCsvBtn').addEventListener('click', exportStudentsCsv);
+      el('renderQrCardsBtn').addEventListener('click', renderQrCardsPreview);
+      el('printQrHandoutsBtn').addEventListener('click', printQrHandouts);
+      el('downloadQrCsvBtn').addEventListener('click', exportQrCsv);
+      ['qrSchoolFilter','qrRoundFilter'].forEach(id=> el(id).addEventListener('change', renderQrCardsPreview));
+      el('downloadResponsesBtn').addEventListener('click', exportResponsesCsv);
+      el('refreshResponsesBtn').addEventListener('click', ()=>{ renderAdminFilters(); renderResponseList(); renderHistoryList(); renderAdminOverview(); renderAdminTrend(); renderAggregateSummary(); });
+      el('refreshHistoryBtn').addEventListener('click', ()=>{ renderHistoryList(); renderIndividualReport(); });
+      ['schoolSelect','projectTitle','recordDate','studentNote','guardianNote','sessionRoundSelect','gradeSelect','classSelect','studentSelect'].forEach(id=> el(id).addEventListener('change', renderIndividualReport));
+      document.querySelectorAll('.mediaSelect').forEach(sel=> sel.addEventListener('change', renderIndividualReport));
+      ['aggregateGradeFilter','aggregateClassFilter','aggregateMode'].forEach(id=> el(id).addEventListener('change', renderAggregateSummary));
+      window.addEventListener('resize', ()=>{ renderHistoryList(); renderAdminOverview(); renderAdminTrend(); renderAggregateSummary(); renderIndividualReport(); });
+      el('clearResponsesBtn').addEventListener('click', ()=>{
+        if(confirm('端末内の回答をすべて削除します。よろしいですか。')){ saveJson(RESPONSES_KEY, []); renderResponseList(); renderHistoryList(); renderAdminOverview(); renderAdminTrend(); renderAggregateSummary(); renderIndividualReport(); showStatus('端末内の回答を削除しました。'); }
+      });
+      el('saveFirebaseBtn').addEventListener('click', saveFirebaseConfig);
+      el('testFirebaseBtn').addEventListener('click', testFirebase);
+      el('fillSleepBtn').addEventListener('click', fillRecommendedSleep);
+      el('clearTimelineBtn').addEventListener('click', ()=>{ timeline = Array(48).fill('empty'); renderTimeline(); updateTimelineSummary(); });
+      el('exportJsonBtn').addEventListener('click', exportJson);
+      el('studentsCsvInput').addEventListener('change', e=>{ const file = e.target.files?.[0]; if(file) importStudentsCsv(file); e.target.value=''; });
+      el('importJsonInput').addEventListener('change', e=>{ const file = e.target.files?.[0]; if(file) importJson(file); e.target.value=''; });
+    }
+
+    init();
+  </script>
+</body>
+</html>
